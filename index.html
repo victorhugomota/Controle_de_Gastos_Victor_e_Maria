@@ -2061,12 +2061,6 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
                       <div class="pv-sub">Clique para ver detalhes <span class="chevron" id="chev-bol-m-${b.id}">▼</span></div>
                     </div>
                     ${botaoPagoBoleto(b)}
-                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarBoletoProximoMes('${b.id}')" title="Replicar este boleto para o próximo mês">
-                      🔁 Replicar
-                    </button>
-                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;margin-left:.25rem" onclick="event.stopPropagation(); editarValorBoletoDocumento('${b.id}')" title="Editar valor do boleto">
-                      ✏️ Editar
-                    </button>
                     <button type="button" class="btn-danger" style="padding:.35rem .65rem;font-size:.78rem" onclick="event.stopPropagation(); excluirBoletoDocumento('${b.id}')" title="Excluir este boleto de todos os lugares do sistema">
                       🗑️ Excluir
                     </button>
@@ -2078,7 +2072,6 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
                     <div style="display:flex;gap:.35rem;flex-wrap:wrap">
                       <button class="btn-secondary" style="color:#38bdf8;border-color:rgba(56,189,248,.3)" onclick="replicarBoletoProximoMes('${b.id}')">🔁 Replicar p/ Próximo Mês</button>
                       <button class="btn-secondary" onclick="editarValorBoletoDocumento('${b.id}')">✏️ Editar Valor</button>
-                      <button class="btn-danger" onclick="excluirBoletoDocumento('${b.id}')">🗑️ Excluir Boleto</button>
                     </div>
                   </div>
                   ${renderItensBoleto(b)}
@@ -4069,12 +4062,6 @@ function renderBoletos() {
                       <div class="pv-sub">Boleto do Mês</div>
                     </div>
                     ${botaoPagoBoleto(b)}
-                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarBoletoProximoMes('${b.id}')" title="Replicar este boleto para o próximo mês">
-                      🔁 Replicar
-                    </button>
-                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;margin-left:.25rem" onclick="event.stopPropagation(); editarValorBoletoDocumento('${b.id}')" title="Editar valor do boleto">
-                      ✏️ Editar
-                    </button>
                     <button type="button" class="btn-danger" style="padding:.35rem .65rem;font-size:.78rem" onclick="event.stopPropagation(); excluirBoletoDocumento('${b.id}')" title="Excluir este boleto de todos os lugares do sistema">
                       🗑️ Excluir
                     </button>
@@ -4087,7 +4074,6 @@ function renderBoletos() {
                     <div style="display:flex;gap:.35rem;flex-wrap:wrap">
                       <button class="btn-secondary" style="color:#38bdf8;border-color:rgba(56,189,248,.3)" onclick="replicarBoletoProximoMes('${b.id}')">🔁 Replicar p/ Próximo Mês</button>
                       <button class="btn-secondary" onclick="editarValorBoletoDocumento('${b.id}')">✏️ Editar Valor</button>
-                      <button class="btn-danger" onclick="excluirBoletoDocumento('${b.id}')">🗑️ Excluir Boleto</button>
                     </div>
                   </div>
                   ${renderItensBoleto(b)}
@@ -4247,32 +4233,27 @@ function getNomeBoleto(b) {
 
 function renderItensBoleto(b) {
   if (b.itens && b.itens.length > 0) {
+    const variosItens = b.itens.length > 1;
     return `<div class="table-responsive"><table class="custom-table">
-      <thead><tr><th>Data</th><th>Descrição / Item</th><th class="num">Valor</th><th>Ação</th></tr></thead>
+      <thead><tr><th>Data</th><th>Descrição / Item</th><th class="num">Valor</th>${variosItens ? '<th>Ação</th>' : ''}</tr></thead>
       <tbody>${b.itens.map((i, idx) => `<tr>
         <td><strong>${i.dataBoleto || '—'}</strong></td>
         <td>${esc(i.descricao)}</td>
         <td class="num" style="color:#c084fc"><strong>${brl(i.valor)}</strong></td>
-        <td>
+        ${variosItens ? `<td>
           <div style="display:flex;gap:.35rem;align-items:center">
-            <button class="btn-secondary" style="padding:.2rem .5rem; font-size:.78rem;" onclick="editarItemBoleto('${b.id}', ${idx})" title="Editar valor deste item">✏️ Editar</button>
-            <button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="removerItemBoletoCadastrado('${b.id}', ${idx})">🗑️ Excluir</button>
+            <button class="btn-secondary" style="padding:.2rem .5rem; font-size:.78rem;" onclick="editarItemBoleto('${b.id}', ${idx})" title="Editar valor deste item">✏️ Editar item</button>
+            <button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="removerItemBoletoCadastrado('${b.id}', ${idx})" title="Remover só este item do boleto">🗑️ Remover item</button>
           </div>
-        </td>
+        </td>` : ''}
       </tr>`).join('')}</tbody>
     </table></div>`;
   }
   return `<div class="table-responsive"><table class="custom-table">
-    <thead><tr><th>Descrição</th><th class="num">Valor</th><th>Ação</th></tr></thead>
+    <thead><tr><th>Descrição</th><th class="num">Valor</th></tr></thead>
     <tbody><tr>
       <td>${esc(b.descricao || 'Boleto')}</td>
       <td class="num" style="color:#c084fc"><strong>${brl(b.valor || b.valorTotal)}</strong></td>
-      <td>
-        <div style="display:flex;gap:.35rem;align-items:center">
-          <button class="btn-secondary" style="padding:.2rem .5rem; font-size:.78rem;" onclick="editarValorBoletoDocumento('${b.id}')" title="Editar valor do boleto">✏️ Editar</button>
-          <button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="excluirBoletoDocumento('${b.id}')">🗑️ Excluir</button>
-        </div>
-      </td>
     </tr></tbody>
   </table></div>`;
 }
