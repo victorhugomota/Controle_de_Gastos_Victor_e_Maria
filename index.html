@@ -1910,6 +1910,7 @@ function renderTudoAgora() {
   renderLixeira();
   renderAlertasVencimento();
   renderChartFluxoMensal();
+  reaplicarEstadoExpandido();
 }
 
 // RENDERIZAÇÃO DO MÊS SELECIONADO NA ABA MÊS A MÊS
@@ -2059,9 +2060,7 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
                       <div class="pv-total" style="color:#c084fc">${brl(b.valorTotal)}</div>
                       <div class="pv-sub">Clique para ver detalhes <span class="chevron" id="chev-bol-m-${b.id}">▼</span></div>
                     </div>
-                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;${b.pago ? '' : 'background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)'}" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="${b.pago ? 'Voltar para em aberto' : 'Marcar este boleto como pago'}">
-                      ${b.pago ? '↩️ Em aberto' : '✅ Pago'}
-                    </button>
+                    ${botaoPagoBoleto(b)}
                     <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarBoletoProximoMes('${b.id}')" title="Replicar este boleto para o próximo mês">
                       🔁 Replicar
                     </button>
@@ -4045,6 +4044,7 @@ function renderBoletos() {
           <div style="display:flex;align-items:center;gap:.75rem">
             <span class="badge purple" style="font-size:.85rem">Total: ${brl(totalMes)} (${boletosDoMes.length} boleto${boletosDoMes.length > 1 ? 's' : ''})</span>
             ${qtdPagos ? `<span class="badge green" style="font-size:.78rem">${qtdPagos}/${boletosDoMes.length} pago${qtdPagos > 1 ? 's' : ''}</span>` : ''}
+            ${m !== 'Outros' ? `<button type="button" class="btn-secondary" style="padding:.35rem .7rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarTodosBoletosDoMes('${m}')" title="Replicar todos os boletos deste mês para o mês seguinte">🔁 Replicar todos</button>` : ''}
             <span class="chevron ${isFirst ? 'open' : ''}" id="chev-bol-group-${m}">▼</span>
           </div>
         </div>
@@ -4068,9 +4068,7 @@ function renderBoletos() {
                       <div class="pv-total" style="color:#c084fc">${brl(valorTotalBoleto)}</div>
                       <div class="pv-sub">Boleto do Mês</div>
                     </div>
-                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;${b.pago ? '' : 'background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)'}" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="${b.pago ? 'Voltar para em aberto' : 'Marcar este boleto como pago'}">
-                      ${b.pago ? '↩️ Em aberto' : '✅ Pago'}
-                    </button>
+                    ${botaoPagoBoleto(b)}
                     <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarBoletoProximoMes('${b.id}')" title="Replicar este boleto para o próximo mês">
                       🔁 Replicar
                     </button>
@@ -4141,11 +4139,20 @@ function statusBoleto(b) {
   return { tipo: 'aberto', dias, badge: `<span class="badge cyan">Em aberto</span>` };
 }
 
+// Botão mostra a SITUAÇÃO ATUAL: verde "Pago" ou "Marcar como pago"
+function botaoPagoBoleto(b) {
+  if (b.pago) {
+    return `<button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;background:#059669;color:#fff;border:1px solid #10b981" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="Boleto pago${b.dataPagamento ? ' em ' + esc(fmtDataVencimento(b.dataPagamento)) : ''}. Clique para desmarcar.">✅ Pago</button>`;
+  }
+  return `<button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;background:transparent;color:var(--text-muted);border:1px dashed #64748b" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="Boleto ainda não pago. Clique para marcar como pago hoje.">⬜ Marcar como pago</button>`;
+}
+
 window.alternarBoletoPago = async function(id) {
   const boleto = todosBoletos.find(b => b.id === id);
   if (!boleto) return;
   try {
     if (boleto.pago) {
+      if (!confirm(`Desmarcar o pagamento de "${getNomeBoleto(boleto)}"? Ele voltará a ficar em aberto.`)) return;
       await updateDoc(doc(db, COLL_BOLETOS, id), { pago: false, dataPagamento: deleteField() });
       toastMsg('↩️ Boleto marcado como em aberto.');
     } else {
@@ -4459,6 +4466,82 @@ function calcularProximoMes(dataVenc, mesAno) {
   return { novoMesAno, novaDataVencimento, novaDataFormatadaBR, ano, mes: mesStr };
 }
 
+// Monta a cópia de um boleto para o mês seguinte (sem status de pago)
+function montarBoletoReplicado(boleto) {
+  const { novoMesAno, novaDataVencimento, novaDataFormatadaBR } = calcularProximoMes(boleto.dataVencimento, boleto.mesAno);
+  const valorTotal = boleto.valorTotal !== undefined ? boleto.valorTotal : (boleto.valor || 0);
+  const novosItens = Array.isArray(boleto.itens) ? boleto.itens.map(item => ({
+    ...item,
+    dataBoleto: novaDataFormatadaBR
+  })) : [];
+
+  return {
+    descricao: boleto.descricao || getNomeBoleto(boleto),
+    beneficiario: boleto.beneficiario || '',
+    valorTotal: valorTotal,
+    valor: valorTotal,
+    dataVencimento: novaDataVencimento,
+    mesAno: novoMesAno,
+    qtdItens: novosItens.length || boleto.qtdItens || 1,
+    itens: novosItens,
+    codigoBarras: boleto.codigoBarras || '',
+    linhaDigitavel: boleto.linhaDigitavel || '',
+    replicadoDe: boleto.id,
+    createdAt: serverTimestamp()
+  };
+}
+
+function nomeMesExtenso(mesAno) {
+  const [ano, mes] = String(mesAno).split('-');
+  if (!ano || !mes) return mesAno;
+  const nome = new Date(parseInt(ano), parseInt(mes) - 1, 1).toLocaleString('pt-BR', { month: 'long' });
+  return `${nome.charAt(0).toUpperCase() + nome.slice(1)}/${ano}`;
+}
+
+// Replica todos os boletos de um mês para o mês seguinte.
+// Boletos que já existem no mês de destino (mesmo nome) são ignorados para não duplicar.
+window.replicarTodosBoletosDoMes = async function(mesAno) {
+  const doMes = todosBoletos.filter(b => b.mesAno === mesAno);
+  if (!doMes.length) return;
+
+  const novos = [];
+  const ignorados = [];
+  doMes.forEach(b => {
+    const novo = montarBoletoReplicado(b);
+    const nome = getNomeBoleto(b);
+    const jaExiste = todosBoletos.some(x => x.mesAno === novo.mesAno && (x.replicadoDe === b.id || getNomeBoleto(x) === nome));
+    (jaExiste ? ignorados : novos).push({ nome, novo });
+  });
+
+  const destinos = [...new Set(doMes.map(b => montarBoletoReplicado(b).mesAno))];
+  const destinoFmt = destinos.map(nomeMesExtenso).join(', ');
+
+  if (!novos.length) {
+    alert(`Todos os ${doMes.length} boletos de ${nomeMesExtenso(mesAno)} já existem em ${destinoFmt}. Nada para replicar.`);
+    return;
+  }
+
+  const total = novos.reduce((acc, x) => acc + (x.novo.valorTotal || 0), 0);
+  let msg = `🔁 Replicar ${novos.length} boleto${novos.length > 1 ? 's' : ''} de ${nomeMesExtenso(mesAno)} para ${destinoFmt}?\n\n` +
+    novos.map(x => `• ${x.nome} — ${brl(x.novo.valorTotal)} (vence ${fmtDataVencimento(x.novo.dataVencimento)})`).join('\n') +
+    `\n\nTotal: ${brl(total)}`;
+  if (ignorados.length) {
+    msg += `\n\nJá existem no mês seguinte e serão ignorados:\n` + ignorados.map(x => `• ${x.nome}`).join('\n');
+  }
+  if (!confirm(msg)) return;
+
+  try {
+    // Lote atômico: ou todos são criados, ou nenhum
+    const batch = writeBatch(db);
+    novos.forEach(x => batch.set(doc(collection(db, COLL_BOLETOS)), x.novo));
+    await batch.commit();
+    toastMsg(`🔁 ${novos.length} boleto${novos.length > 1 ? 's' : ''} replicado${novos.length > 1 ? 's' : ''} para ${destinoFmt}!`, 5000);
+  } catch (err) {
+    console.error('Erro ao replicar boletos:', err);
+    alert('Erro ao replicar boletos: ' + err.message);
+  }
+};
+
 window.replicarBoletoProximoMes = async function(id) {
   const boleto = todosBoletos.find(b => b.id === id);
   if (!boleto) {
@@ -4476,27 +4559,7 @@ window.replicarBoletoProximoMes = async function(id) {
   }
 
   try {
-    const novosItens = Array.isArray(boleto.itens) ? boleto.itens.map(item => ({
-      ...item,
-      dataBoleto: novaDataFormatadaBR
-    })) : [];
-
-    const novoBoleto = {
-      descricao: boleto.descricao || desc,
-      beneficiario: boleto.beneficiario || '',
-      valorTotal: valorTotal,
-      valor: valorTotal,
-      dataVencimento: novaDataVencimento,
-      mesAno: novoMesAno,
-      qtdItens: novosItens.length || boleto.qtdItens || 1,
-      itens: novosItens,
-      codigoBarras: boleto.codigoBarras || '',
-      linhaDigitavel: boleto.linhaDigitavel || '',
-      replicadoDe: boleto.id,
-      createdAt: serverTimestamp()
-    };
-
-    await addDoc(collection(db, COLL_BOLETOS), novoBoleto);
+    await addDoc(collection(db, COLL_BOLETOS), montarBoletoReplicado(boleto));
     toastMsg(`🔁 Boleto "${desc}" replicado para ${novoMesAno} com sucesso!`);
   } catch (err) {
     console.error('Erro ao replicar boleto:', err);
@@ -5939,6 +6002,21 @@ function renderItensCompra(c) {
   </table></div>`;
 }
 
+// Guarda o que o usuário abriu/fechou para reaplicar depois de cada atualização da tela
+// (antes, qualquer clique recarregava a lista e voltava tudo ao padrão)
+const estadoExpandido = new Map();
+
+function reaplicarEstadoExpandido() {
+  estadoExpandido.forEach((st, elId) => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.classList.toggle('open', st.aberto);
+    if (st.tipo === 'grupo') el.style.display = st.aberto ? 'block' : 'none';
+    const chev = st.chevId && document.getElementById(st.chevId);
+    if (chev) chev.classList.toggle('open', st.aberto);
+  });
+}
+
 window.toggleDetail = function(id) {
   let d = document.getElementById('detail-' + id) || document.getElementById(id);
   if (!d && id.startsWith('detail-')) {
@@ -5947,6 +6025,7 @@ window.toggleDetail = function(id) {
   let c = document.getElementById('chev-' + id) || document.getElementById('chev-' + id.replace('detail-', ''));
   if (d) d.classList.toggle('open');
   if (c) c.classList.toggle('open');
+  if (d && d.id) estadoExpandido.set(d.id, { tipo: 'detalhe', aberto: d.classList.contains('open'), chevId: c ? c.id : null });
 };
 
 window.toggleGroupMonth = function(id) {
@@ -5959,6 +6038,7 @@ window.toggleGroupMonth = function(id) {
     if (isHidden) chev.classList.add('open');
     else chev.classList.remove('open');
   }
+  estadoExpandido.set(id, { tipo: 'grupo', aberto: isHidden, chevId: 'chev-' + id });
 };
 
 window.confirmarExcluirMercado = async function(id) {
