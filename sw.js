@@ -1,8 +1,8 @@
 // Service worker do app instalável.
 // Página: rede primeiro (sempre pega a versão mais nova; usa o cache só sem internet).
 // Ícones/manifest: cache primeiro. Dados do Firestore nunca passam por aqui (outro domínio).
-const CACHE = 'financas-vm-v1';
-const ARQUIVOS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'financas-vm-v2';
+const ARQUIVOS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png', './icons/logo.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)));

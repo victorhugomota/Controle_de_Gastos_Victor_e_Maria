@@ -2,27 +2,30 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Controle Financeiro Completo — Victor &amp; Maria</title>
   <meta name="description" content="Sistema completo de gestão financeira pessoal: Salários/Holerites, Cartões de Crédito, Mercado, Reservas e Orçamento Familiar.">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#00314d">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Finanças V&amp;M">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root {
-      --bg-dark: #0f172a;
-      --bg-card: #1e293b;
-      --bg-card-hover: #334155;
-      --border-color: #334155;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
+      --bg-dark: #071a29;
+      --bg-card: #0f2537;
+      --bg-card-hover: #173550;
+      --border-color: #1f3e58;
+      --text-main: #eef4fa;
+      --text-muted: #8fa8bd;
+      --brand: #ffc532;
+      --brand-escuro: #00314d;
+      --sidebar-w: 260px;
       --primary: #10b981;
       --primary-hover: #059669;
       --primary-glow: rgba(16,185,129,0.25);
@@ -37,32 +40,55 @@
       --shadow-card: 0 10px 25px -5px rgba(0,0,0,.3),0 8px 10px -6px rgba(0,0,0,.3);
     }
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-dark);color:var(--text-main);min-height:100vh;padding-bottom:80px;-webkit-font-smoothing:antialiased}
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-dark);color:var(--text-main);min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden}
     a{color:inherit}
 
-    /* Header */
-    .app-header{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--border-color);padding:.9rem 1.5rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem}
-    .logo-container{display:flex;align-items:center;gap:.75rem}
-    .logo-icon{width:42px;height:42px;border-radius:var(--radius-md);background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:1.3rem;box-shadow:0 0 15px var(--primary-glow)}
-    .logo-text h1{font-size:1.15rem;font-weight:800;background:linear-gradient(to right,#fff,#cbd5e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .logo-text p{font-size:.72rem;color:var(--text-muted)}
+    /* ═══ ESTRUTURA DO APP: MENU LATERAL + BARRA SUPERIOR ═══ */
+    .app-shell{display:flex;min-height:100vh}
+    .sidebar{width:var(--sidebar-w);flex-shrink:0;position:sticky;top:0;height:100vh;background:linear-gradient(180deg,#00395a 0%,#002b45 55%,#00223a 100%);border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;z-index:200}
+    .sidebar-brand{display:flex;align-items:center;gap:.75rem;padding:1.25rem 1.1rem 1rem;padding-top:max(1.25rem,env(safe-area-inset-top))}
+    .sidebar-brand img{width:46px;height:46px;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+    .sidebar-brand strong{display:block;font-size:1rem;font-weight:800;color:#fff;line-height:1.2}
+    .sidebar-brand span{font-size:.75rem;color:#9fc3dc}
+    .sidebar-nav{flex:1;overflow-y:auto;padding:.25rem .75rem .75rem}
+    .nav-section{font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#6f97b3;padding:1rem .6rem .4rem}
+    .nav-item{width:100%;display:flex;align-items:center;gap:.75rem;background:transparent;border:none;color:#c5d9e8;padding:.62rem .75rem;border-radius:10px;font-family:inherit;font-size:.9rem;font-weight:500;cursor:pointer;text-align:left;transition:background .15s,color .15s;position:relative;margin-bottom:2px}
+    .nav-item svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;opacity:.9}
+    .nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+    .nav-item.active{background:rgba(255,197,50,.14);color:#ffd766;font-weight:700}
+    .nav-item.active::before{content:'';position:absolute;left:-.75rem;top:22%;bottom:22%;width:4px;border-radius:0 4px 4px 0;background:var(--brand)}
+    .sidebar-footer{padding:.75rem;padding-bottom:max(.75rem,env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.08)}
+    .sidebar-footer .nav-item{font-size:.84rem;padding:.5rem .75rem}
+    .sidebar-user{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.55rem .65rem .55rem .8rem;margin-top:.4rem;background:rgba(0,0,0,.2);border-radius:10px}
+    .sidebar-user span{font-size:.82rem;color:#e2eef7;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sidebar-user button{background:rgba(255,255,255,.08);color:#e2eef7;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:.35rem .7rem;font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit}
+    .sidebar-overlay{display:none}
+    .app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+    .app-main > .main-container{width:100%}
+    .topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:.85rem;padding:1rem 1.75rem;background:rgba(7,26,41,.9);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border-color)}
+    .topbar-titulo{min-width:0;flex:1}
+    .topbar h1{font-size:1.2rem;font-weight:800;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar p{font-size:.76rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar-data{font-size:.8rem;color:var(--text-muted);font-weight:600;white-space:nowrap}
+    .menu-toggle{display:none;align-items:center;justify-content:center;width:42px;height:42px;flex-shrink:0;border-radius:11px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-main);cursor:pointer}
+    .menu-toggle svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+    .topbar-logo{display:none;width:34px;height:34px;border-radius:9px;flex-shrink:0}
+    .logo-icon{width:42px;height:42px;border-radius:var(--radius-md);overflow:hidden}
 
-    /* Desktop Nav */
-    .desktop-nav{display:flex;gap:.35rem;flex-wrap:wrap}
-    .nav-item{background:transparent;color:var(--text-muted);border:none;padding:.55rem .85rem;border-radius:var(--radius-sm);font-weight:500;font-size:.85rem;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.35rem;font-family:inherit}
-    .nav-item:hover{color:var(--text-main);background:rgba(255,255,255,.06)}
-    .nav-item.active{color:#fff;background:var(--bg-card);border:1px solid var(--border-color);font-weight:600}
-
-    /* Mobile Nav */
-    .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(30,41,59,.97);backdrop-filter:blur(16px);border-top:1px solid var(--border-color);padding:.4rem .2rem;justify-content:space-around}
-    .mob-btn{background:transparent;border:none;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.72rem;min-height:48px;justify-content:center;font-weight:500;padding:.35rem;border-radius:var(--radius-sm);cursor:pointer;flex:1;font-family:inherit}
-    .mob-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
-    .mob-btn.active{color:var(--primary)}
-    .mob-mais-menu{display:none;position:absolute;bottom:calc(100% + .5rem);right:.5rem;left:.5rem;background:rgba(30,41,59,.98);backdrop-filter:blur(16px);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:.6rem;grid-template-columns:repeat(4,1fr);gap:.35rem;box-shadow:var(--shadow-card)}
-    .mob-mais-menu.open{display:grid}
-    .mob-mais-menu .mob-btn{padding:.6rem .25rem;font-size:.72rem}
-
-    @media(max-width:850px){.desktop-nav{display:none}.mobile-nav{display:flex}.app-header{padding:.8rem 1rem}}
+    @media(max-width:1023px){
+      .sidebar{position:fixed;left:0;top:0;bottom:0;height:100%;width:min(84vw,300px);transform:translateX(-102%);transition:transform .25s ease;box-shadow:10px 0 30px rgba(0,0,0,.45)}
+      body.menu-aberto .sidebar{transform:none}
+      .sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,10,20,.6);opacity:0;pointer-events:none;transition:opacity .25s;z-index:150}
+      body.menu-aberto .sidebar-overlay{opacity:1;pointer-events:auto}
+      body.menu-aberto{overflow:hidden}
+      .menu-toggle{display:inline-flex}
+      .topbar{padding:.65rem .9rem;padding-top:max(.65rem,env(safe-area-inset-top))}
+      .topbar h1{font-size:1.05rem}
+      .topbar-data{display:none}
+      .topbar-logo{display:block}
+      .nav-item{padding:.8rem .85rem;font-size:.95rem}
+    }
 
     /* Layout */
     .main-container{max-width:1240px;margin:0 auto;padding:1.5rem}
@@ -229,6 +255,132 @@
     .btn-card-select:hover{background:var(--bg-card-hover);color:var(--text-main)}
     .btn-card-select.active[data-card="Nubank"]{border-color:#a855f7;background:rgba(168,85,247,.2);color:#c084fc;box-shadow:0 0 15px rgba(168,85,247,.3)}
     .btn-card-select.active[data-card="Santander"]{border-color:#f43f5e;background:rgba(244,63,94,.2);color:#fb7185;box-shadow:0 0 15px rgba(244,63,94,.3)}
+
+    /* ═══ PAINEL (VISÃO GERAL) ═══ */
+    .seg-tabs{display:flex;gap:.25rem;background:var(--bg-card);border:1px solid var(--border-color);padding:.3rem;border-radius:13px;margin-bottom:1.25rem;width:fit-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+    .seg-tabs::-webkit-scrollbar{display:none}
+    .seg-btn{background:transparent;border:none;color:var(--text-muted);padding:.55rem 1.05rem;border-radius:10px;font-family:inherit;font-weight:600;font-size:.86rem;cursor:pointer;white-space:nowrap;transition:all .15s}
+    .seg-btn:hover{color:var(--text-main)}
+    .seg-btn.active{background:var(--brand);color:#1d1600;font-weight:700}
+    .dash-painel{display:none}
+    .dash-painel.active{display:block;animation:fadeIn .25s ease}
+    .mes-foco{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+    .mes-foco h2{font-size:1rem;font-weight:800}
+    .mes-foco p{font-size:.78rem;color:var(--text-muted)}
+    .mes-nav{display:inline-flex;align-items:center;gap:.25rem;background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:.25rem}
+    .mes-nav button{background:transparent;border:none;color:var(--text-main);width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:1.2rem;line-height:1;font-family:inherit}
+    .mes-nav button:hover:not(:disabled){background:var(--bg-card-hover)}
+    .mes-nav button:disabled{opacity:.25;cursor:default}
+    .mes-nav strong{min-width:120px;text-align:center;font-size:.92rem}
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-bottom:1.25rem}
+    .kpi{background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:1.1rem 1.15rem 1rem;position:relative;overflow:hidden;min-width:0}
+    .kpi::before{content:'';position:absolute;left:0;top:0;right:0;height:3px;background:var(--kpi-cor,var(--brand))}
+    .kpi-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);display:flex;align-items:center;justify-content:space-between;gap:.4rem}
+    .kpi-valor{font-size:1.55rem;font-weight:800;margin:.4rem 0 .25rem;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .kpi-sub{font-size:.75rem;color:var(--text-muted);line-height:1.45}
+    .delta{display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;font-weight:700;padding:.12rem .45rem;border-radius:20px;white-space:nowrap;letter-spacing:0;text-transform:none}
+    .delta.bom{background:rgba(16,185,129,.15);color:#34d399}
+    .delta.ruim{background:rgba(244,63,94,.15);color:#fb7185}
+    .delta.neutro{background:rgba(148,163,184,.14);color:#94a3b8}
+    .acoes-rapidas{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+    .acao-chip{display:inline-flex;align-items:center;gap:.4rem;background:var(--bg-card);border:1px solid var(--border-color);color:var(--text-main);padding:.55rem .95rem;border-radius:999px;font-family:inherit;font-size:.84rem;font-weight:600;cursor:pointer;transition:border-color .15s,background .15s}
+    .acao-chip:hover{border-color:var(--brand);background:var(--bg-card-hover)}
+    .acao-chip.destaque{background:var(--primary);border-color:var(--primary);color:#fff}
+    .acao-chip.destaque:hover{background:var(--primary-hover)}
+    .dash-grid-2{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:1.25rem;margin-bottom:1.25rem}
+    .dash-grid-meio{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;margin-bottom:1.25rem}
+    .grid-summary.acumulado{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.85rem}
+    .grid-summary.acumulado .card{padding:1rem;box-shadow:none}
+    .grid-summary.acumulado .card-value{font-size:1.3rem}
+    .grid-summary.acumulado .card-icon{width:32px;height:32px;font-size:.95rem}
+
+    /* Tabela resumo mês a mês */
+    .tabela-resumo th{font-size:.74rem;text-transform:uppercase;letter-spacing:.05em}
+    .tabela-resumo td,.tabela-resumo th{white-space:nowrap;padding:.75rem .7rem}
+    .barra-uso{width:60px}
+    *{scrollbar-width:thin;scrollbar-color:#2a4a66 transparent}
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-thumb{background:#2a4a66;border-radius:8px}
+    ::-webkit-scrollbar-track{background:transparent}
+    .tabela-resumo tbody tr{cursor:pointer}
+    .tabela-resumo tbody tr:hover td{background:rgba(255,255,255,.035)}
+    .tabela-resumo tr.mes-atual td{background:rgba(255,197,50,.07)}
+    .tabela-resumo tr.mes-atual td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
+    .tabela-resumo tfoot td{font-weight:800;border-top:2px solid var(--border-color);background:rgba(0,0,0,.18)}
+    .barra-uso{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:.45rem}
+    .barra-uso > span{display:block;height:100%;border-radius:4px}
+    .icone-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:.85rem}
+    .icone-btn:hover{color:var(--text-main);background:var(--bg-card-hover)}
+    .icone-btn.perigo:hover{color:#fb7185;border-color:rgba(244,63,94,.4)}
+    .meses-cards{display:none}
+    .mes-card{background:rgba(0,0,0,.16);border:1px solid var(--border-color);border-radius:14px;padding:.9rem}
+    .mes-card.mes-atual{border-color:rgba(255,197,50,.5)}
+    .mes-card-topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+    .mes-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:.45rem .9rem;font-size:.8rem}
+    .mes-card-grid span{color:var(--text-muted);display:block;font-size:.7rem}
+    .mes-card-acoes{display:flex;gap:.5rem;margin-top:.75rem}
+    .mes-card-acoes button{flex:1}
+
+    /* Comparar meses */
+    .comp-controles{display:flex;align-items:flex-end;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem}
+    .comp-controles label{display:block;font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem}
+    .comp-controles select{min-width:180px}
+    .comp-controles .comp-vs{height:46px;display:flex;align-items:center}
+    .comp-tabela td,.comp-tabela th{white-space:nowrap}
+    .comp-tabela tr.total td{font-weight:800;background:rgba(0,0,0,.15)}
+    .destaque-item{display:flex;gap:.65rem;padding:.65rem 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.85rem;line-height:1.45}
+    .destaque-item:last-child{border-bottom:none}
+    .destaque-item b{font-weight:700}
+
+    @media(max-width:1100px){
+      .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .dash-grid-2,.dash-grid-meio{grid-template-columns:minmax(0,1fr)}
+    }
+
+    /* ═══ CELULAR: VISUAL LIMPO, CONTÍNUO E SEM ZOOM ═══ */
+    @media(max-width:640px){
+      input,select,textarea,.form-control{font-size:16px !important}
+      .main-container{padding:.8rem .75rem 1.5rem}
+      .card{border-radius:14px;padding:1rem;box-shadow:none}
+      .card-header{flex-wrap:wrap;gap:.5rem}
+      .card-value{font-size:1.4rem}
+      .grid-summary{gap:.7rem;grid-template-columns:minmax(0,1fr)}
+      .grid-summary.acumulado{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .grid-summary.acumulado .card-value{font-size:1.05rem}
+      .grid-summary.acumulado .card-subtext{display:none}
+      .kpi-grid{gap:.6rem}
+      .kpi{padding:.85rem .85rem .8rem;border-radius:14px}
+      .kpi-valor{font-size:1.2rem}
+      .kpi-label{font-size:.66rem}
+      .seg-tabs{width:100%}
+      .seg-btn{flex:1;padding:.55rem .6rem;font-size:.8rem}
+      .mes-nav strong{min-width:100px;font-size:.88rem}
+      .acoes-rapidas{flex-wrap:nowrap;overflow-x:auto;margin:0 -.75rem 1rem;padding:0 .75rem .25rem;scrollbar-width:none}
+      .acoes-rapidas::-webkit-scrollbar{display:none}
+      .acao-chip{flex-shrink:0}
+      .tabela-resumo-wrap{display:none}
+      .meses-cards{display:flex;flex-direction:column;gap:.65rem}
+      .comp-controles > div{flex:1;min-width:0}
+      .comp-controles select{min-width:0;width:100%}
+      .custom-table{font-size:.8rem}
+      .custom-table th,.custom-table td{padding:.6rem .6rem}
+      .purchase-header{padding:.85rem .9rem;flex-wrap:wrap;gap:.6rem}
+      .purchase-info h3{font-size:.95rem;line-height:1.4}
+      .purchase-info p{font-size:.74rem}
+      .purchase-values{width:100%;margin-left:0;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.5rem}
+      .purchase-values > div:first-child{text-align:left !important;flex-basis:100%}
+      .purchase-values > button{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;white-space:nowrap;padding:.55rem .5rem !important}
+      .purchase-card{margin-bottom:.7rem !important;border-radius:14px}
+      .card .card{padding:.75rem}
+      .card-header .card-title{font-size:.86rem !important}
+      .card-header .badge{font-size:.72rem !important}
+      .purchase-details{padding:.85rem .9rem}
+      .modal-overlay{padding:.5rem}
+      .modal-box{padding:1.1rem;max-height:94vh;border-radius:16px}
+      .section-title{margin-top:1.25rem;padding-top:1rem}
+      .chart-container{height:240px}
+      .sub-nav{margin-bottom:1rem}
+    }
   </style>
 </head>
 <body>
@@ -236,7 +388,7 @@
 <!-- TELA DE LOGIN -->
 <div id="tela-login" style="position:fixed;inset:0;z-index:3000;background:var(--bg-dark);display:flex;align-items:center;justify-content:center;padding:1rem">
   <div class="card" style="max-width:400px;width:100%;text-align:center;padding:2rem 1.5rem">
-    <div class="logo-icon" style="margin:0 auto 1rem;width:64px;height:64px;font-size:2rem">💼</div>
+    <img src="icons/logo.png" alt="" style="display:block;margin:0 auto 1rem;width:84px;height:84px;border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.35)">
     <h1 style="font-size:1.35rem;font-weight:800;margin-bottom:.25rem">Controle Financeiro</h1>
     <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1.5rem">Victor &amp; Maria</p>
     <p id="login-msg" style="color:var(--text-muted);font-size:.88rem;margin-bottom:1.25rem;min-height:1.4em">⏳ Verificando acesso...</p>
@@ -248,32 +400,52 @@
   </div>
 </div>
 
-<!-- HEADER -->
-<header class="app-header">
-  <div class="logo-container">
-    <div class="logo-icon">💼</div>
-    <div class="logo-text">
-      <h1>Controle Financeiro</h1>
-      <p>Victor &amp; Maria</p>
+<!-- ESTRUTURA DO APP -->
+<div class="app-shell">
+
+  <!-- MENU LATERAL (no celular vira gaveta) -->
+  <aside class="sidebar" id="sidebar" aria-label="Menu principal">
+    <div class="sidebar-brand">
+      <img src="icons/logo.png" alt="">
+      <div><strong>Controle Financeiro</strong><span>Victor &amp; Maria</span></div>
     </div>
-  </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Visão</div>
+      <button class="nav-item active" data-tab="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Visão Geral</span></button>
+      <button class="nav-item" data-tab="mensal"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Controle Mensal</span></button>
+      <div class="nav-section">Lançamentos</div>
+      <button class="nav-item" data-tab="salarios"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Salários &amp; Entradas</span></button>
+      <button class="nav-item" data-tab="cartoes"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span>Cartões de Crédito</span></button>
+      <button class="nav-item" data-tab="boletos"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Boletos &amp; Contas</span></button>
+      <button class="nav-item" data-tab="mercado"><svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span>Mercado</span></button>
+      <div class="nav-section">Planejamento</div>
+      <button class="nav-item" data-tab="estimativa"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Estimativa de Custos</span></button>
+      <button class="nav-item" data-tab="reservas"><svg viewBox="0 0 24 24"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M21 7H14a3 3 0 0 0 0 6h7z"/><circle cx="15.5" cy="10" r=".6"/></svg><span>Reservas &amp; Economias</span></button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="nav-item" id="btn-exportar-backup" onclick="exportarBackupJSON()" title="Baixa uma cópia de todos os dados do banco em um arquivo JSON"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Exportar Backup</span></button>
+      <button class="nav-item" id="btn-abrir-lixeira" onclick="abrirLixeira()" title="Registros excluídos que podem ser restaurados"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg><span>Lixeira</span></button>
+      <div class="sidebar-user" id="usuario-logado" style="display:none">
+        <span id="usuario-nome"></span>
+        <button onclick="sairDaConta()" title="Sair da conta">Sair</button>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" onclick="fecharMenu()"></div>
 
-  <nav class="desktop-nav">
-    <button class="nav-item active" data-tab="dashboard">📊 Visão Geral</button>
-    <button class="nav-item" data-tab="mensal">📅 Controle Mensal</button>
-    <button class="nav-item" data-tab="salarios">💵 Salários &amp; Entradas</button>
-    <button class="nav-item" data-tab="cartoes">💳 Cartões de Crédito</button>
-    <button class="nav-item" data-tab="boletos">📄 Boletos</button>
-    <button class="nav-item" data-tab="mercado">🛒 Mercado</button>
-    <button class="nav-item" data-tab="estimativa">🔮 Estimativa de Custos</button>
-    <button class="nav-item" data-tab="reservas">🐷 Reservas &amp; Economias</button>
-  </nav>
-
-  <div id="usuario-logado" style="display:none;align-items:center;gap:.5rem;flex-shrink:0">
-    <span id="usuario-nome" style="font-size:.82rem;color:var(--text-muted);font-weight:600"></span>
-    <button class="btn-secondary" onclick="sairDaConta()" style="padding:.4rem .7rem;font-size:.78rem" title="Sair da conta">Sair</button>
-  </div>
-</header>
+  <div class="app-main">
+    <!-- BARRA SUPERIOR -->
+    <header class="topbar">
+      <button class="menu-toggle" type="button" onclick="abrirMenu()" aria-label="Abrir menu" aria-controls="sidebar">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+      </button>
+      <div class="topbar-titulo">
+        <h1 id="topbar-titulo">Visão Geral</h1>
+        <p id="topbar-subtitulo">Resumo financeiro da família</p>
+      </div>
+      <span class="topbar-data" id="topbar-data"></span>
+      <img class="topbar-logo" src="icons/logo.png" alt="">
+    </header>
 
 <!-- MAIN -->
 <main class="main-container">
@@ -285,122 +457,168 @@
     <!-- Alertas de vencimento de boletos -->
     <div id="alertas-vencimento"></div>
 
-    <!-- Grade de Resumo Geral -->
-    <div class="grid-summary">
+    <div class="seg-tabs" role="tablist" aria-label="Seções do painel">
+      <button class="seg-btn active" data-dash="dash-resumo" role="tab">📊 Resumo</button>
+      <button class="seg-btn" data-dash="dash-comparar" role="tab">⚖️ Comparar Meses</button>
+      <button class="seg-btn" data-dash="dash-evolucao" role="tab">📈 Evolução</button>
+    </div>
+
+    <!-- ── RESUMO ─────────────────────────────────────────────── -->
+    <div id="dash-resumo" class="dash-painel active">
+      <div class="mes-foco">
+        <div>
+          <h2>Mês em foco</h2>
+          <p>Valores do mês e variação em relação ao mês anterior</p>
+        </div>
+        <div class="mes-nav">
+          <button type="button" id="btn-mes-foco-ant" onclick="navegarMesFoco(-1)" aria-label="Mês anterior">‹</button>
+          <strong id="mes-foco-label">—</strong>
+          <button type="button" id="btn-mes-foco-prox" onclick="navegarMesFoco(1)" aria-label="Próximo mês">›</button>
+        </div>
+      </div>
+      <div class="kpi-grid" id="kpis-mes"></div>
+
+      <div class="acoes-rapidas">
+        <button class="acao-chip destaque" id="btn-open-modal-home">🛒 Escanear nota</button>
+        <button class="acao-chip" onclick="goTab('salarios')">💵 Holerite / Entrada</button>
+        <button class="acao-chip" onclick="goTab('cartoes')">💳 Importar fatura</button>
+        <button class="acao-chip" onclick="goTab('boletos')">📄 Importar boleto</button>
+        <button class="acao-chip" onclick="goTab('reservas')">🐷 Metas de reserva</button>
+      </div>
+
+      <!-- Tabela de Resumo Mensal (mantida, com layout novo) -->
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-header">
+          <span class="card-title">🗓️ Resumo mês a mês</span>
+          <span class="card-subtext">Clique em um mês para abrir o Controle Mensal</span>
+        </div>
+        <div id="tabela-resumo-mensal"></div>
+      </div>
+
+      <div class="section-title">Acumulado de todos os meses</div>
+      <div class="grid-summary acumulado">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Entradas</span>
+            <div class="card-icon green">💵</div>
+          </div>
+          <div class="card-value" id="fin-total-entradas" style="color:#34d399">R$ 0,00</div>
+          <div class="card-subtext" id="fin-subtext-entradas">Victor + Maria + Entradas Manuais</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Cartões</span>
+            <div class="card-icon rose">💳</div>
+          </div>
+          <div class="card-value" id="fin-total-cartoes" style="color:#fb7185">R$ 0,00</div>
+          <div class="card-subtext" id="fin-subtext-cartoes">Faturas de todos os meses</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Boletos</span>
+            <div class="card-icon purple">📄</div>
+          </div>
+          <div class="card-value" id="fin-total-boletos" style="color:#c084fc">R$ 0,00</div>
+          <div class="card-subtext" id="fin-subtext-boletos">Boletos de todos os meses</div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Mercado (Débito)</span>
+            <div class="card-icon amber">🛒</div>
+          </div>
+          <div class="card-value" id="fin-mercado-debito" style="color:#fbbf24">R$ 0,00</div>
+          <div class="card-subtext">Saída real da conta (sem Alimentação)</div>
+        </div>
+        <div class="card" style="border-color:rgba(96,165,250,.45)">
+          <div class="card-header">
+            <span class="card-title" style="color:#60a5fa">Saldo Líquido</span>
+            <div class="card-icon cyan">💰</div>
+          </div>
+          <div class="card-value" id="fin-saldo-liquido" style="color:#60a5fa">R$ 0,00</div>
+          <div class="card-subtext" id="fin-subtext-saldo">Entradas - Cartões - Boletos - Mercado (Débito)</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:1.25rem">
+        <div class="card-header">
+          <span class="card-title">🛒 Gastos de mercado por forma de pagamento</span>
+          <span class="badge amber">💡 Apenas Débito reduz o salário</span>
+        </div>
+        <div class="payment-grid">
+          <div class="payment-item">
+            <div class="p-label">🍽️ Vale Alimentação (Benefício)</div>
+            <div class="p-val" id="dash-alimentacao">R$ 0,00</div>
+          </div>
+          <div class="payment-item">
+            <div class="p-label">💳 Cartão Crédito no Mercado</div>
+            <div class="p-val" id="dash-credito">R$ 0,00</div>
+          </div>
+          <div class="payment-item" style="border-color:rgba(245,158,11,.4)">
+            <div class="p-label">💳 Débito no Mercado (Sai da Conta)</div>
+            <div class="p-val" id="dash-debito" style="color:#fbbf24">R$ 0,00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── COMPARAR MESES ─────────────────────────────────────── -->
+    <div id="dash-comparar" class="dash-painel">
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="comp-controles">
+          <div>
+            <label for="comp-mes-a">Mês A (base)</label>
+            <select id="comp-mes-a" class="form-control" onchange="alterarComparacao()"></select>
+          </div>
+          <div class="comp-vs">
+            <button type="button" class="icone-btn" onclick="inverterComparacao()" title="Inverter os meses" aria-label="Inverter os meses">⇄</button>
+          </div>
+          <div>
+            <label for="comp-mes-b">Mês B (comparado)</label>
+            <select id="comp-mes-b" class="form-control" onchange="alterarComparacao()"></select>
+          </div>
+        </div>
+        <div id="comp-resumo"></div>
+      </div>
+
+      <div class="dash-grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">📊 Mês A × Mês B</span></div>
+          <div class="chart-container"><canvas id="chart-comparativo" aria-label="Gráfico comparando dois meses"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">💡 Destaques</span></div>
+          <div id="comp-destaques"></div>
+        </div>
+      </div>
+
+      <div class="dash-grid-meio">
+        <div class="card">
+          <div class="card-header"><span class="card-title">📄 Boletos por conta</span></div>
+          <div id="comp-boletos"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">💳 Faturas por cartão</span></div>
+          <div id="comp-cartoes"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EVOLUÇÃO ───────────────────────────────────────────── -->
+    <div id="dash-evolucao" class="dash-painel">
+      <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-header">
+          <span class="card-title">📈 Entradas × Saídas por mês</span>
+          <span class="badge cyan">Saídas = Cartões + Boletos + Débito Mercado</span>
+        </div>
+        <div class="chart-container"><canvas id="chart-fluxo-mensal" aria-label="Gráfico de entradas e saídas por mês"></canvas></div>
+      </div>
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Entradas / Salários</span>
-          <div class="card-icon green">💵</div>
+          <span class="card-title">🧾 Para onde vai o dinheiro (saídas por tipo)</span>
         </div>
-        <div class="card-value" id="fin-total-entradas" style="color:#34d399">R$ 0,00</div>
-        <div class="card-subtext" id="fin-subtext-entradas">Victor + Maria + Entradas Manuais</div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Cartão de Crédito</span>
-          <div class="card-icon rose">💳</div>
-        </div>
-        <div class="card-value" id="fin-total-cartoes" style="color:#fb7185">R$ 0,00</div>
-        <div class="card-subtext" id="fin-subtext-cartoes">Faturas do Mês</div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Boletos &amp; Contas</span>
-          <div class="card-icon purple">📄</div>
-        </div>
-        <div class="card-value" id="fin-total-boletos" style="color:#c084fc">R$ 0,00</div>
-        <div class="card-subtext" id="fin-subtext-boletos">Boletos do Mês</div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Mercado (Débito)</span>
-          <div class="card-icon amber">🛒</div>
-        </div>
-        <div class="card-value" id="fin-mercado-debito" style="color:#fbbf24">R$ 0,00</div>
-        <div class="card-subtext">Saída real da conta (Sem Alimentação)</div>
-      </div>
-
-      <div class="card" style="border-color:#3b82f6; background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(15,23,42,.95))">
-        <div class="card-header">
-          <span class="card-title" style="color:#60a5fa">Saldo Líquido em Conta</span>
-          <div class="card-icon cyan">💰</div>
-        </div>
-        <div class="card-value" id="fin-saldo-liquido" style="color:#60a5fa">R$ 0,00</div>
-        <div class="card-subtext" id="fin-subtext-saldo">Entradas - Cartões - Boletos - Mercado (Débito)</div>
+        <div class="chart-container"><canvas id="chart-saidas-tipo" aria-label="Gráfico de saídas por tipo em cada mês"></canvas></div>
       </div>
     </div>
-
-    <!-- Botões de Ação Rápida -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem">
-      <button class="btn-primary" id="btn-open-modal-home" style="padding:.9rem">
-        🛒 Escanear Nota Mercado
-      </button>
-      <button class="btn-secondary" onclick="goTab('salarios')" style="padding:.9rem">
-        💵 Cadastrar Holerite / Entrada
-      </button>
-      <button class="btn-secondary" onclick="goTab('cartoes')" style="padding:.9rem">
-        💳 Importar Fatura Cartão
-      </button>
-      <button class="btn-secondary" onclick="goTab('boletos')" style="padding:.9rem">
-        📄 Importar Boleto
-      </button>
-      <button class="btn-secondary" onclick="goTab('reservas')" style="padding:.9rem">
-        🐷 Ver Meta de Reservas
-      </button>
-      <button class="btn-secondary" id="btn-exportar-backup" onclick="exportarBackupJSON()" style="padding:.9rem" title="Baixa uma cópia de todos os dados do banco em um arquivo JSON">
-        💾 Exportar Backup (JSON)
-      </button>
-      <button class="btn-secondary" id="btn-abrir-lixeira" onclick="abrirLixeira()" style="padding:.9rem" title="Registros excluídos que podem ser restaurados">
-        🗑️ Lixeira
-      </button>
-    </div>
-
-    <!-- Card Detalhamento do Orçamento do Mercado (Alimentação, Crédito e Débito) -->
-    <div class="card" style="margin-bottom:1.5rem">
-      <div class="card-header">
-        <span class="card-title">Detalhamento dos Gastos de Mercado</span>
-        <span class="badge amber">💡 Apenas Débito reduz o salário</span>
-      </div>
-      <div class="payment-grid">
-        <div class="payment-item">
-          <div class="p-label">🍽️ Vale Alimentação (Benefício)</div>
-          <div class="p-val" id="dash-alimentacao">R$ 0,00</div>
-        </div>
-        <div class="payment-item">
-          <div class="p-label">💳 Cartão Crédito no Mercado</div>
-          <div class="p-val" id="dash-credito">R$ 0,00</div>
-        </div>
-        <div class="payment-item" style="border-color:rgba(245,158,11,.4)">
-          <div class="p-label">💳 Débito no Mercado (Sai da Conta)</div>
-          <div class="p-val" id="dash-debito" style="color:#fbbf24">R$ 0,00</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Gráfico Entradas x Saídas por Mês -->
-    <div class="card" style="margin-top:1.5rem">
-      <div class="card-header">
-        <span class="card-title">📈 Entradas × Saídas por Mês</span>
-        <span class="badge cyan">Saídas = Cartões + Boletos + Débito Mercado</span>
-      </div>
-      <div class="chart-container"><canvas id="chart-fluxo-mensal" aria-label="Gráfico de entradas e saídas por mês"></canvas></div>
-    </div>
-
-    <!-- Tabela de Resumo Mensal Comparativa (Geral) -->
-    <div class="card" style="margin-top:1.5rem">
-      <div class="card-header">
-        <span class="card-title">🗓️ Resumo Financeiro Mês a Mês</span>
-        <span class="badge cyan">Visão Consolidada</span>
-      </div>
-      <p class="card-subtext" style="margin-bottom:1rem">
-        Consolidado mensal de todas as suas receitas, boletos, faturas de cartão e gastos de mercado.
-      </p>
-      <div id="tabela-resumo-mensal"></div>
-    </div>
-
   </section>
 
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
@@ -1024,39 +1242,8 @@
   </section>
 
 </main>
-
-<!-- MOBILE NAV -->
-<nav class="mobile-nav">
-  <button class="mob-btn active" data-tab="dashboard">
-    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Geral
-  </button>
-  <button class="mob-btn" data-tab="mensal">
-    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Mês
-  </button>
-  <button class="mob-btn" data-tab="boletos">
-    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Boletos
-  </button>
-  <button class="mob-btn" data-tab="mercado">
-    <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Mercado
-  </button>
-  <button class="mob-btn" id="mob-btn-mais" type="button" aria-expanded="false" aria-controls="mob-mais-menu">
-    <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Mais
-  </button>
-  <div class="mob-mais-menu" id="mob-mais-menu">
-    <button class="mob-btn" data-tab="salarios">
-      <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Salários
-    </button>
-    <button class="mob-btn" data-tab="cartoes">
-      <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Cartões
-    </button>
-    <button class="mob-btn" data-tab="estimativa">
-      <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Estimativa
-    </button>
-    <button class="mob-btn" data-tab="reservas">
-      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Reservas
-    </button>
   </div>
-</nav>
+</div>
 
 <!-- MODAL ADICIONAR / EDITAR ITEM ESTIMATIVA -->
 <div id="modal-add-estimativa" class="modal-overlay">
@@ -1414,43 +1601,62 @@ function getBusinessDaysInMonth(year, monthIndex0) {
   return count;
 }
 
-// TAB SWITCHING (NAVEGAÇÃO PRINCIPAL)
+// TAB SWITCHING (NAVEGAÇÃO PRINCIPAL — MENU LATERAL)
+const TITULOS_ABAS = {
+  dashboard: ['Visão Geral', 'Resumo financeiro da família'],
+  mensal: ['Controle Mensal', 'Tudo de um mês em um só lugar'],
+  salarios: ['Salários & Entradas', 'Holerites e entradas extras'],
+  cartoes: ['Cartões de Crédito', 'Faturas e análise de gastos'],
+  boletos: ['Boletos & Contas', 'Contas, pagamentos e vencimentos'],
+  mercado: ['Mercado', 'Notas fiscais e comparação de preços'],
+  estimativa: ['Estimativa de Custos', 'Previsão de gastos do mês'],
+  reservas: ['Reservas & Economias', 'Metas e dinheiro guardado']
+};
+
+window.abrirMenu = function() { document.body.classList.add('menu-aberto'); };
+window.fecharMenu = function() { document.body.classList.remove('menu-aberto'); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharMenu(); });
+
 window.goTab = function(id) {
   document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.desktop-nav .nav-item').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.mobile-nav .mob-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sidebar .nav-item[data-tab]').forEach(b => b.classList.remove('active'));
 
   const sec = document.getElementById('tab-' + id);
   if (sec) sec.classList.add('active');
+  document.querySelectorAll(`.sidebar [data-tab="${id}"]`).forEach(b => b.classList.add('active'));
 
-  document.querySelectorAll(`[data-tab="${id}"]`).forEach(b => b.classList.add('active'));
+  const [titulo, subtitulo] = TITULOS_ABAS[id] || ['Controle Financeiro', ''];
+  document.getElementById('topbar-titulo').textContent = titulo;
+  document.getElementById('topbar-subtitulo').textContent = subtitulo;
 
-  const maisMenu = document.getElementById('mob-mais-menu');
-  const maisBtn = document.getElementById('mob-btn-mais');
-  if (maisMenu && maisBtn) {
-    maisMenu.classList.remove('open');
-    maisBtn.setAttribute('aria-expanded', 'false');
-    maisBtn.classList.toggle('active', !!maisMenu.querySelector(`[data-tab="${id}"]`));
-  }
+  fecharMenu();
   window.scrollTo({ top: 0 });
 };
 
-document.getElementById('mob-btn-mais')?.addEventListener('click', e => {
-  e.stopPropagation();
-  const menu = document.getElementById('mob-mais-menu');
-  const aberto = menu.classList.toggle('open');
-  e.currentTarget.setAttribute('aria-expanded', String(aberto));
-});
-document.addEventListener('click', e => {
-  const menu = document.getElementById('mob-mais-menu');
-  if (menu?.classList.contains('open') && !menu.contains(e.target)) {
-    menu.classList.remove('open');
-    document.getElementById('mob-btn-mais')?.setAttribute('aria-expanded', 'false');
+(function() {
+  const el = document.getElementById('topbar-data');
+  if (el) {
+    const t = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    el.textContent = t.charAt(0).toUpperCase() + t.slice(1);
   }
-});
+})();
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => goTab(btn.getAttribute('data-tab')));
+});
+
+// ABAS DO PAINEL (Resumo / Comparar Meses / Evolução)
+document.querySelectorAll('.seg-btn[data-dash]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.seg-btn[data-dash]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.dash-painel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.getAttribute('data-dash'))?.classList.add('active');
+    // Gráficos criados com a aba escondida precisam recalcular o tamanho
+    if (typeof Chart !== 'undefined') {
+      ['chart-comparativo', 'chart-fluxo-mensal', 'chart-saidas-tipo'].forEach(id => Chart.getChart(id)?.resize());
+    }
+  });
 });
 
 // SUB-TAB SWITCHING (NAVEGAÇÃO INTERNA DO MERCADO)
@@ -1674,7 +1880,8 @@ window.fecharLixeira = function() {
 function renderLixeira() {
   const btn = document.getElementById('btn-abrir-lixeira');
   const total = totalItensLixeira();
-  if (btn) btn.innerHTML = `🗑️ Lixeira${total ? ` (${total})` : ''}`;
+  const rotuloLixeira = btn?.querySelector('span');
+  if (rotuloLixeira) rotuloLixeira.textContent = `Lixeira${total ? ` (${total})` : ''}`;
 
   const body = document.getElementById('lixeira-body');
   if (!body || !document.getElementById('modal-lixeira')?.classList.contains('active')) return;
@@ -1910,6 +2117,9 @@ function renderTudoAgora() {
   renderLixeira();
   renderAlertasVencimento();
   renderChartFluxoMensal();
+  renderKpisMes();
+  renderComparativo();
+  renderChartSaidasTipo();
   reaplicarEstadoExpandido();
 }
 
@@ -2221,65 +2431,336 @@ function renderTabelaResumoMensal() {
     return;
   }
 
-  const linhasHtml = meses.map(m => {
-    const entradasMes = todasEntradas.filter(e => e.mesAno === m).reduce((a,e) => a + (e.valor || 0), 0);
-    const cartoesMes  = todasFaturas.filter(f => f.mesAno === m).reduce((a,f) => a + (f.valorTotal !== undefined ? f.valorTotal : (f.valor || 0)), 0);
-    const boletosMes  = todosBoletos.filter(b => b.mesAno === m).reduce((a,b) => a + (b.valorTotal !== undefined ? b.valorTotal : (b.valor || 0)), 0);
-    
-    let debitoMes = 0;
-    todasCompras.filter(c => c.mesAno === m).forEach(c => {
-      if (c.formasPagamento) debitoMes += c.formasPagamento.cartaoDebito || 0;
-    });
+  const linhas = meses.map(m => ({ m, ...totaisDoMes(m) }));
+  const soma = campo => linhas.reduce((a, l) => a + l[campo], 0);
+  const corSaldo = v => v >= 0 ? '#60a5fa' : '#fb7185';
+  const usoHtml = l => {
+    if (!l.entradas) return '<span class="card-subtext">—</span>';
+    const pct = Math.round((l.saidas / l.entradas) * 100);
+    const cor = pct <= 80 ? '#34d399' : pct <= 100 ? '#fbbf24' : '#fb7185';
+    return `<span class="barra-uso"><span style="width:${Math.min(pct, 100)}%;background:${cor}"></span></span><strong style="color:${cor}">${pct}%</strong>`;
+  };
 
-    const saldoMes = entradasMes - cartoesMes - boletosMes - debitoMes;
-
-    const [ano, mes] = m.split('-');
-    const dObj = new Date(parseInt(ano), parseInt(mes) - 1, 1);
-    const mesNome = dObj.toLocaleString('pt-BR', { month: 'short' }).toUpperCase().replace('.', '');
-    const isCurrent = (m === mesSelecionado);
-
-    return `
-      <tr style="${isCurrent ? 'background:rgba(99,102,241,0.1)' : ''}">
-        <td><strong>📅 ${mesNome}/${ano}</strong></td>
-        <td style="color:#34d399"><strong>${brl(entradasMes)}</strong></td>
-        <td style="color:#fb7185">${brl(cartoesMes)}</td>
-        <td style="color:#c084fc">${brl(boletosMes)}</td>
-        <td style="color:#fbbf24">${brl(debitoMes)}</td>
-        <td style="color:${saldoMes >= 0 ? '#60a5fa' : '#fb7185'}; font-weight:800">${brl(saldoMes)}</td>
-        <td>
-          <div style="display:flex;gap:.35rem;align-items:center">
-            <button class="btn-secondary" style="padding:.25rem .65rem; font-size:.78rem" onclick="verMesEIrParaControle('${m}')">
-              🔍 Ver Mês
-            </button>
-            <button class="btn-danger" style="padding:.25rem .65rem; font-size:.78rem" onclick="excluirDadosDoMes('${m}')">
-              🗑️ Excluir
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="table-responsive">
-      <table class="custom-table">
+  const tabela = `
+    <div class="table-responsive tabela-resumo-wrap">
+      <table class="custom-table tabela-resumo">
         <thead>
           <tr>
-            <th>Mês / Ano</th>
-            <th>Entradas</th>
-            <th>Cartão Crédito</th>
-            <th>Boletos</th>
-            <th>Mercado (Débito)</th>
-            <th>Saldo Líquido</th>
-            <th>Ações</th>
+            <th>Mês</th>
+            <th class="num">Entradas</th>
+            <th class="num">Cartões</th>
+            <th class="num">Boletos</th>
+            <th class="num">Mercado (Débito)</th>
+            <th class="num">Saldo</th>
+            <th>Renda comprometida</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          ${linhasHtml}
+          ${linhas.map(l => `
+            <tr class="${l.m === mesSelecionado ? 'mes-atual' : ''}" onclick="verMesEIrParaControle('${l.m}')" title="Abrir ${rotuloMes(l.m, true)} no Controle Mensal">
+              <td><strong>${rotuloMes(l.m)}</strong></td>
+              <td class="num" style="color:#34d399;font-weight:700">${brl(l.entradas)}</td>
+              <td class="num" style="color:#fb7185">${brl(l.cartoes)}</td>
+              <td class="num" style="color:#c084fc">${brl(l.boletos)}</td>
+              <td class="num" style="color:#fbbf24">${brl(l.debito)}</td>
+              <td class="num" style="color:${corSaldo(l.saldo)};font-weight:800">${brl(l.saldo)}</td>
+              <td>${usoHtml(l)}</td>
+              <td>
+                <div style="display:flex;gap:.35rem;justify-content:flex-end">
+                  <button class="icone-btn" onclick="event.stopPropagation(); verMesEIrParaControle('${l.m}')" title="Ver mês" aria-label="Ver mês">🔍</button>
+                  <button class="icone-btn perigo" onclick="event.stopPropagation(); excluirDadosDoMes('${l.m}')" title="Mover o mês para a lixeira" aria-label="Excluir mês">🗑️</button>
+                </div>
+              </td>
+            </tr>`).join('')}
         </tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="num" style="color:#34d399">${brl(soma('entradas'))}</td>
+            <td class="num" style="color:#fb7185">${brl(soma('cartoes'))}</td>
+            <td class="num" style="color:#c084fc">${brl(soma('boletos'))}</td>
+            <td class="num" style="color:#fbbf24">${brl(soma('debito'))}</td>
+            <td class="num" style="color:${corSaldo(soma('saldo'))}">${brl(soma('saldo'))}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
       </table>
-    </div>
-  `;
+    </div>`;
+
+  const cartoes = `
+    <div class="meses-cards">
+      ${linhas.map(l => `
+        <div class="mes-card ${l.m === mesSelecionado ? 'mes-atual' : ''}">
+          <div class="mes-card-topo">
+            <strong>${rotuloMes(l.m, true)}</strong>
+            <strong style="color:${corSaldo(l.saldo)}">${brl(l.saldo)}</strong>
+          </div>
+          <div class="mes-card-grid">
+            <div><span>Entradas</span><b style="color:#34d399">${brl(l.entradas)}</b></div>
+            <div><span>Cartões</span><b style="color:#fb7185">${brl(l.cartoes)}</b></div>
+            <div><span>Boletos</span><b style="color:#c084fc">${brl(l.boletos)}</b></div>
+            <div><span>Mercado (Débito)</span><b style="color:#fbbf24">${brl(l.debito)}</b></div>
+          </div>
+          <div style="margin-top:.6rem;font-size:.75rem;color:var(--text-muted)">Renda comprometida: ${usoHtml(l)}</div>
+          <div class="mes-card-acoes">
+            <button class="btn-secondary" style="padding:.5rem;font-size:.82rem" onclick="verMesEIrParaControle('${l.m}')">🔍 Ver mês</button>
+            <button class="btn-danger" style="padding:.5rem;font-size:.82rem" onclick="excluirDadosDoMes('${l.m}')">🗑️ Excluir</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  container.innerHTML = tabela + cartoes;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAINEL: MÊS EM FOCO, COMPARAR MESES E EVOLUÇÃO (somente leitura dos dados)
+// ═══════════════════════════════════════════════════════════════════════════
+function valorDocFinanceiro(x) {
+  return x.valorTotal !== undefined ? x.valorTotal : (x.valor || 0);
+}
+
+function totaisDoMes(m) {
+  const entradas = todasEntradas.filter(x => x.mesAno === m).reduce((a, x) => a + (x.valor || 0), 0);
+  const cartoes = todasFaturas.filter(x => x.mesAno === m).reduce((a, x) => a + valorDocFinanceiro(x), 0);
+  const boletosMes = todosBoletos.filter(x => x.mesAno === m);
+  const boletos = boletosMes.reduce((a, x) => a + valorDocFinanceiro(x), 0);
+  const debito = todasCompras.filter(x => x.mesAno === m).reduce((a, x) => a + (x.formasPagamento?.cartaoDebito || 0), 0);
+  const saidas = cartoes + boletos + debito;
+  const abertos = boletosMes.filter(b => !b.pago);
+  return {
+    entradas, cartoes, boletos, debito, saidas,
+    saldo: entradas - saidas,
+    qtdBoletos: boletosMes.length,
+    qtdBoletosPagos: boletosMes.length - abertos.length,
+    valorBoletosAbertos: abertos.reduce((a, x) => a + valorDocFinanceiro(x), 0)
+  };
+}
+
+function mesAnteriorDe(m) {
+  const [a, ms] = m.split('-').map(Number);
+  const d = new Date(a, ms - 2, 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+function rotuloMes(m, longo = false) {
+  const [a, ms] = String(m).split('-').map(Number);
+  if (!a || !ms) return m;
+  const nome = new Date(a, ms - 1, 1).toLocaleString('pt-BR', { month: longo ? 'long' : 'short' }).replace('.', '');
+  return `${nome.charAt(0).toUpperCase() + nome.slice(1)}${longo ? ' de ' : '/'}${a}`;
+}
+
+// Variação em relação ao valor anterior. maiorEhMelhor=false para gastos.
+function deltaHtml(atual, anterior, maiorEhMelhor) {
+  if (!anterior && !atual) return '<span class="delta neutro">—</span>';
+  if (!anterior) return '<span class="delta neutro">novo</span>';
+  const pct = ((atual - anterior) / Math.abs(anterior)) * 100;
+  if (Math.abs(pct) < 0.5) return '<span class="delta neutro">= 0%</span>';
+  const bom = (pct > 0) === maiorEhMelhor;
+  return `<span class="delta ${bom ? 'bom' : 'ruim'}">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(Math.abs(pct) < 10 ? 1 : 0)}%</span>`;
+}
+
+window.navegarMesFoco = function(dir) {
+  const meses = getMesesDisponiveis().slice().sort();
+  const idx = meses.indexOf(mesSelecionado);
+  const alvo = meses[idx + dir];
+  if (alvo) selecionarMesGlobal(alvo);
+};
+
+function renderKpisMes() {
+  const el = document.getElementById('kpis-mes');
+  if (!el) return;
+  const m = mesSelecionado;
+  const t = totaisDoMes(m);
+  const ant = mesAnteriorDe(m);
+  const p = totaisDoMes(ant);
+
+  const meses = getMesesDisponiveis().slice().sort();
+  const idx = meses.indexOf(m);
+  document.getElementById('mes-foco-label').textContent = rotuloMes(m, true);
+  document.getElementById('btn-mes-foco-ant').disabled = idx <= 0;
+  document.getElementById('btn-mes-foco-prox').disabled = idx < 0 || idx >= meses.length - 1;
+
+  const pctComprometido = t.entradas ? Math.round((t.saidas / t.entradas) * 100) : null;
+  const kpi = (cor, rotulo, valor, delta, sub, corValor) => `
+    <div class="kpi" style="--kpi-cor:${cor}">
+      <div class="kpi-label"><span>${rotulo}</span>${delta}</div>
+      <div class="kpi-valor" style="color:${corValor || cor}">${valor}</div>
+      <div class="kpi-sub">${sub}</div>
+    </div>`;
+
+  el.innerHTML =
+    kpi('#34d399', 'Entradas', brl(t.entradas), deltaHtml(t.entradas, p.entradas, true),
+      `${rotuloMes(ant)}: ${brl(p.entradas)}`) +
+    kpi('#fb7185', 'Saídas', brl(t.saidas), deltaHtml(t.saidas, p.saidas, false),
+      `Cartões ${brl(t.cartoes)} · Boletos ${brl(t.boletos)} · Mercado ${brl(t.debito)}`) +
+    kpi(t.saldo >= 0 ? '#60a5fa' : '#fb7185', 'Saldo do mês', brl(t.saldo), deltaHtml(t.saldo, p.saldo, true),
+      pctComprometido === null ? 'Sem entradas cadastradas' : `${pctComprometido}% da renda comprometida`) +
+    kpi('#fbbf24', 'Boletos em aberto', brl(t.valorBoletosAbertos), '',
+      t.qtdBoletos ? `${t.qtdBoletosPagos} de ${t.qtdBoletos} boletos pagos` : 'Nenhum boleto no mês');
+}
+
+let compMesA = null;
+let compMesB = null;
+
+window.alterarComparacao = function() {
+  compMesA = document.getElementById('comp-mes-a').value;
+  compMesB = document.getElementById('comp-mes-b').value;
+  renderComparativo();
+};
+
+window.inverterComparacao = function() {
+  [compMesA, compMesB] = [compMesB, compMesA];
+  renderComparativo();
+};
+
+function tabelaComparacao(linhas, rotuloA, rotuloB) {
+  if (!linhas.length) return '<div class="empty-state" style="padding:1.25rem">Sem registros nesses meses.</div>';
+  return `<div class="table-responsive"><table class="custom-table comp-tabela">
+    <thead><tr><th></th><th class="num">${rotuloA}</th><th class="num">${rotuloB}</th><th class="num">Diferença</th><th class="num">Var.</th></tr></thead>
+    <tbody>${linhas.map(l => {
+      const dif = l.b - l.a;
+      const bom = l.maiorEhMelhor ? dif >= 0 : dif <= 0;
+      const corDif = Math.abs(dif) < 0.005 ? 'var(--text-muted)' : (bom ? '#34d399' : '#fb7185');
+      return `<tr class="${l.total ? 'total' : ''}">
+        <td>${l.nome}</td>
+        <td class="num">${brl(l.a)}</td>
+        <td class="num">${brl(l.b)}</td>
+        <td class="num" style="color:${corDif};font-weight:700">${dif > 0 ? '+' : ''}${brl(dif)}</td>
+        <td class="num">${deltaHtml(l.b, l.a, l.maiorEhMelhor)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function renderComparativo() {
+  const selA = document.getElementById('comp-mes-a');
+  const selB = document.getElementById('comp-mes-b');
+  if (!selA || !selB) return;
+
+  const meses = getMesesDisponiveis();
+  if (!meses.length) return;
+  if (!compMesB || !meses.includes(compMesB)) compMesB = meses.includes(mesSelecionado) ? mesSelecionado : meses[0];
+  if (!compMesA || !meses.includes(compMesA)) {
+    const ant = mesAnteriorDe(compMesB);
+    compMesA = meses.includes(ant) ? ant : (meses.find(x => x < compMesB) || meses[meses.length - 1]);
+  }
+
+  const opcoes = meses.map(m => `<option value="${m}">${rotuloMes(m, true)}</option>`).join('');
+  selA.innerHTML = opcoes;
+  selB.innerHTML = opcoes;
+  selA.value = compMesA;
+  selB.value = compMesB;
+
+  const A = totaisDoMes(compMesA);
+  const B = totaisDoMes(compMesB);
+  const rA = rotuloMes(compMesA);
+  const rB = rotuloMes(compMesB);
+
+  document.getElementById('comp-resumo').innerHTML = tabelaComparacao([
+    { nome: '💵 Entradas', a: A.entradas, b: B.entradas, maiorEhMelhor: true },
+    { nome: '💳 Cartões', a: A.cartoes, b: B.cartoes, maiorEhMelhor: false },
+    { nome: '📄 Boletos', a: A.boletos, b: B.boletos, maiorEhMelhor: false },
+    { nome: '🛒 Mercado (débito)', a: A.debito, b: B.debito, maiorEhMelhor: false },
+    { nome: '📤 Total de saídas', a: A.saidas, b: B.saidas, maiorEhMelhor: false, total: true },
+    { nome: '💰 Saldo', a: A.saldo, b: B.saldo, maiorEhMelhor: true, total: true }
+  ], rA, rB);
+
+  // Boletos por conta e faturas por cartão
+  const agrupar = (lista, chave) => {
+    const mapa = {};
+    lista.forEach(x => {
+      const k = chave(x);
+      mapa[k] ||= { a: 0, b: 0 };
+      if (x.mesAno === compMesA) mapa[k].a += valorDocFinanceiro(x);
+      if (x.mesAno === compMesB) mapa[k].b += valorDocFinanceiro(x);
+    });
+    return Object.entries(mapa)
+      .map(([nome, v]) => ({ nome: esc(nome), a: v.a, b: v.b, maiorEhMelhor: false }))
+      .sort((x, y) => Math.abs(y.b - y.a) - Math.abs(x.b - x.a) || y.b - x.b);
+  };
+  const doisMeses = x => x.mesAno === compMesA || x.mesAno === compMesB;
+  const boletosComp = agrupar(todosBoletos.filter(doisMeses), getNomeBoleto);
+  const cartoesComp = agrupar(todasFaturas.filter(doisMeses), f => f.cartao || f.descricao || 'Cartão');
+  document.getElementById('comp-boletos').innerHTML = tabelaComparacao(boletosComp, rA, rB);
+  document.getElementById('comp-cartoes').innerHTML = tabelaComparacao(cartoesComp, rA, rB);
+
+  // Destaques em texto
+  const destaques = [];
+  const difSaldo = B.saldo - A.saldo;
+  if (A.saldo || B.saldo) {
+    destaques.push(['💰', `O saldo ${difSaldo >= 0 ? '<b style="color:#34d399">melhorou</b>' : '<b style="color:#fb7185">piorou</b>'} ${brl(Math.abs(difSaldo))} (${brl(A.saldo)} → ${brl(B.saldo)}).`]);
+  }
+  const cats = [['Cartões', A.cartoes, B.cartoes], ['Boletos', A.boletos, B.boletos], ['Mercado (débito)', A.debito, B.debito]]
+    .map(([n, a, b]) => ({ n, dif: b - a }));
+  const maiorAlta = cats.filter(c => c.dif > 0.005).sort((x, y) => y.dif - x.dif)[0];
+  const maiorQueda = cats.filter(c => c.dif < -0.005).sort((x, y) => x.dif - y.dif)[0];
+  if (maiorAlta) destaques.push(['📈', `Maior aumento de gasto: <b>${maiorAlta.n}</b> (+${brl(maiorAlta.dif)}).`]);
+  if (maiorQueda) destaques.push(['📉', `Maior economia: <b>${maiorQueda.n}</b> (${brl(maiorQueda.dif)}).`]);
+  const contaMaisSubiu = boletosComp.filter(x => x.a > 0 && x.b > x.a + 0.005)[0];
+  if (contaMaisSubiu) destaques.push(['📄', `A conta <b>${contaMaisSubiu.nome}</b> subiu ${brl(contaMaisSubiu.b - contaMaisSubiu.a)}.`]);
+  const novas = boletosComp.filter(x => !x.a && x.b).map(x => x.nome);
+  if (novas.length) destaques.push(['🆕', `Contas só em ${rB}: ${novas.join(', ')}.`]);
+  const sairam = boletosComp.filter(x => x.a && !x.b).map(x => x.nome);
+  if (sairam.length) destaques.push(['➖', `Contas que não aparecem em ${rB}: ${sairam.join(', ')}.`]);
+  if (A.entradas && B.entradas) {
+    destaques.push(['⚖️', `Renda comprometida: ${Math.round(A.saidas / A.entradas * 100)}% em ${rA} → <b>${Math.round(B.saidas / B.entradas * 100)}%</b> em ${rB}.`]);
+  }
+  document.getElementById('comp-destaques').innerHTML = destaques.length
+    ? destaques.map(([i, t]) => `<div class="destaque-item"><span>${i}</span><div>${t}</div></div>`).join('')
+    : '<div class="empty-state" style="padding:1.25rem">Sem dados suficientes para comparar.</div>';
+
+  // Gráfico A × B
+  if (typeof Chart === 'undefined') return setTimeout(renderComparativo, 300);
+  const ctx = document.getElementById('chart-comparativo')?.getContext('2d');
+  if (!ctx) return;
+  Chart.getChart('chart-comparativo')?.destroy();
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Entradas', 'Cartões', 'Boletos', 'Mercado', 'Saldo'],
+      datasets: [
+        { label: rA, data: [A.entradas, A.cartoes, A.boletos, A.debito, A.saldo], backgroundColor: 'rgba(119,169,255,0.55)', borderRadius: 6 },
+        { label: rB, data: [B.entradas, B.cartoes, B.boletos, B.debito, B.saldo], backgroundColor: 'rgba(255,197,50,0.85)', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#cbd5e1' } }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${brl(c.raw)}` } } },
+      scales: {
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#8fa8bd', callback: v => 'R$' + v.toLocaleString('pt-BR') } },
+        x: { grid: { display: false }, ticks: { color: '#8fa8bd' } }
+      }
+    }
+  });
+}
+
+function renderChartSaidasTipo() {
+  if (typeof Chart === 'undefined') return setTimeout(renderChartSaidasTipo, 300);
+  const ctx = document.getElementById('chart-saidas-tipo')?.getContext('2d');
+  if (!ctx) return;
+  const dados = getMesesDisponiveis().slice().sort().map(m => ({ m, ...totaisDoMes(m) })).filter(d => d.saidas);
+  Chart.getChart('chart-saidas-tipo')?.destroy();
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dados.length ? dados.map(d => rotuloMes(d.m)) : ['Sem dados'],
+      datasets: [
+        { label: 'Cartões', data: dados.map(d => d.cartoes), backgroundColor: 'rgba(244,63,94,0.75)', stack: 's' },
+        { label: 'Boletos', data: dados.map(d => d.boletos), backgroundColor: 'rgba(168,85,247,0.75)', stack: 's' },
+        { label: 'Mercado (débito)', data: dados.map(d => d.debito), backgroundColor: 'rgba(245,158,11,0.8)', stack: 's' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#cbd5e1' } }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${brl(c.raw)}` } } },
+      scales: {
+        y: { stacked: true, grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#8fa8bd', callback: v => 'R$' + v.toLocaleString('pt-BR') } },
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#8fa8bd' } }
+      }
+    }
+  });
 }
 
 window.excluirDadosDoMes = async function(targetMesAno) {
