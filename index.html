@@ -457,6 +457,9 @@
   <!-- 1. ABA DASHBOARD (VISÃO GERAL DO CONTROLE FINANCEIRO COMPLETO) -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
   <section id="tab-dashboard" class="tab-content active">
+    <!-- Aviso do relatório mensal (a partir do dia 05) -->
+    <div id="aviso-relatorio"></div>
+
     <!-- Alertas de vencimento de boletos -->
     <div id="alertas-vencimento"></div>
 
@@ -1183,6 +1186,10 @@
   <!-- 5. ABA RESERVAS & ECONOMIAS (ESTIMATIVA, VALOR REAL & RECOMENDAÇÃO INTELIGENTE) -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
   <section id="tab-reservas" class="tab-content">
+    <!-- Assistente financeiro (orçamento do mês, para onde vai o dinheiro, metas e previsão) -->
+    <div id="assistente-financeiro"></div>
+
+    <div class="section-title">Metas de reserva</div>
     <div class="grid-summary">
       <!-- Card Meta Pessoal / Necessária -->
       <div class="card">
@@ -2182,6 +2189,8 @@ function renderTudoAgora() {
   renderKpisMes();
   renderComparativo();
   renderAnalisesMercado();
+  renderAssistenteFinanceiro();
+  renderAvisoRelatorio();
   renderChartSaidasTipo();
   reaplicarEstadoExpandido();
 }
@@ -2590,7 +2599,7 @@ function totaisDoMes(m) {
   const boletos = boletosMes.reduce((a, x) => a + valorDocFinanceiro(x), 0);
   const debito = todasCompras.filter(x => x.mesAno === m).reduce((a, x) => a + (x.formasPagamento?.cartaoDebito || 0), 0);
   const saidas = cartoes + boletos + debito;
-  const abertos = boletosMes.filter(b => !b.pago);
+  const abertos = boletosMes.filter(b => !boletoPago(b));
   return {
     entradas, cartoes, boletos, debito, saidas,
     saldo: entradas - saidas,
@@ -3700,7 +3709,21 @@ function categorizarItemCartao(descricao) {
   return CATEGORIAS_CARTAO.find(c => c.re.test(desc)) || CATEGORIA_OUTROS;
 }
 
+// Estado da tela do cartão que precisa sobreviver às atualizações
+window.estadoCartao = window.estadoCartao || { categoriasAberto: false, mesLimites: null };
+
+window.selecionarMesLimitesCartao = function(mes) {
+  window.estadoCartao.mesLimites = mes;
+  renderTudo();
+};
+
 window.salvarRegraCategoria = async function(chave, categoria) {
+  // Aplica na hora na tela; o banco confirma em seguida
+  const regras = { ...(configCartoes.regrasCategoria || {}) };
+  if (categoria) regras[chave] = categoria; else delete regras[chave];
+  configCartoes = { ...configCartoes, regrasCategoria: regras };
+  window.estadoCartao.categoriasAberto = true;
+  renderTudo();
   try {
     await setDoc(doc(db, COLL_RESERVAS, 'config-cartoes'), {
       regrasCategoria: { [chave]: categoria ? categoria : deleteField() }
@@ -3713,6 +3736,10 @@ window.salvarRegraCategoria = async function(chave, categoria) {
 
 window.salvarLimiteCategoria = async function(chave, valor) {
   const v = parseFloat(String(valor).replace(',', '.'));
+  const limites = { ...(configCartoes.limites || {}) };
+  if (!isNaN(v) && v > 0) limites[chave] = v; else delete limites[chave];
+  configCartoes = { ...configCartoes, limites };
+  renderTudo();
   try {
     await setDoc(doc(db, COLL_RESERVAS, 'config-cartoes'), {
       limites: { [chave]: (!isNaN(v) && v > 0) ? v : deleteField() }
@@ -3817,12 +3844,21 @@ function renderHtmlInsightsCartao(faturas) {
           <strong style="white-space:nowrap">${brl(x.mediana)}</strong>
         </div>`).join('')}`;
 
-  // ── Limites por categoria (mês da fatura mais recente) ──
+  // ── Limites por categoria (mês escolhido; padrão: o mais recente com itens) ──
+  const mesesComItens = [...new Set(faturas.filter(f => (f.itens || []).length && f.mesAno).map(f => f.mesAno))].sort().reverse();
+  let mesLimites = window.estadoCartao.mesLimites;
+  if (!mesLimites || !mesesComItens.includes(mesLimites)) mesLimites = mesesComItens[0] || mesMaisRecente;
   const gastoCatMes = {};
-  faturas.filter(f => f.mesAno === mesMaisRecente).forEach(f => (f.itens || []).forEach(i => {
-    const c = categorizarItemCartao(i.descricao).nome;
-    gastoCatMes[c] = (gastoCatMes[c] || 0) + (i.valor || 0);
-  }));
+  let semDetalhes = 0;
+  faturas.filter(f => f.mesAno === mesLimites).forEach(f => {
+    let somaItens = 0;
+    (f.itens || []).forEach(i => {
+      const c = categorizarItemCartao(i.descricao).nome;
+      gastoCatMes[c] = (gastoCatMes[c] || 0) + (i.valor || 0);
+      somaItens += i.valor || 0;
+    });
+    semDetalhes += Math.max(0, valorDocFinanceiro(f) - somaItens);
+  });
   const limites = configCartoes.limites || {};
   const todasCats = [...CATEGORIAS_CARTAO, CATEGORIA_OUTROS];
   const estourados = todasCats.filter(c => limites[chaveRegra(c.nome)] && (gastoCatMes[c.nome] || 0) > limites[chaveRegra(c.nome)]);
@@ -3856,14 +3892,14 @@ function renderHtmlInsightsCartao(faturas) {
     const regra = regras[chave];
     const auto = CATEGORIAS_CARTAO.find(c => c.re.test(normalizarTextoProduto(e.exemplo))) || CATEGORIA_OUTROS;
     return { ...e, chave, regra, auto };
-  }).sort((a, b) => ((a.auto === CATEGORIA_OUTROS && !a.regra) ? -1 : 0) - ((b.auto === CATEGORIA_OUTROS && !b.regra) ? -1 : 0) || b.valor - a.valor)
-    .slice(0, 25);
+  }).sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome)) // ordem fixa: não pula ao salvar
+    .slice(0, 40);
   const qtdOutros = listaEstabs.filter(e => e.auto === CATEGORIA_OUTROS && !e.regra).length;
   const categoriasHtml = listaEstabs.map(e => `
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:.6rem;align-items:center;font-size:.82rem;padding:.35rem 0;border-top:1px solid rgba(255,255,255,.05)">
       <div style="min-width:0">
         <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>${esc(e.nome)}</strong></div>
-        <div class="card-subtext">${brl(e.valor)} nos últimos 3 meses${e.regra ? ' · <span style="color:#34d399">ajustada por vocês</span>' : ''}</div>
+        <div class="card-subtext">${brl(e.valor)} nos últimos 3 meses · ${e.regra ? `<span style="color:#34d399">✔ ${categoriaPorNome(e.regra).icone} ${e.regra} (ajustada por vocês)</span>` : `${e.auto === CATEGORIA_OUTROS ? '<span style="color:#fbbf24">' : '<span>'}${e.auto.icone} ${e.auto.nome} (automática)</span>`}</div>
       </div>
       <select class="form-control" style="padding:.3rem .5rem;font-size:.8rem" onchange="salvarRegraCategoria('${e.chave}', this.value)" aria-label="Categoria de ${esc(e.nome)}">
         <option value="" ${!e.regra ? 'selected' : ''}>Automática (${e.auto.nome})</option>
@@ -3891,11 +3927,17 @@ function renderHtmlInsightsCartao(faturas) {
         </div>
       </div>
       <div style="${estiloBloco};margin-bottom:1rem">
-        <div style="font-weight:700;font-size:.9rem;margin-bottom:.35rem">🎯 Limites por categoria — ${rotuloMes(mesMaisRecente, true)}</div>
-        <div class="card-subtext" style="margin-bottom:.5rem">Digite um limite mensal; a barra fica amarela perto do limite e vermelha quando passa.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
+          <div style="font-weight:700;font-size:.9rem">🎯 Limites por categoria</div>
+          <select class="form-control" style="width:auto;padding:.3rem .6rem;font-size:.8rem" onchange="selecionarMesLimitesCartao(this.value)" aria-label="Mês dos limites">
+            ${mesesComItens.map(m => `<option value="${m}" ${m === mesLimites ? 'selected' : ''}>Fatura de ${rotuloMes(m, true)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="card-subtext" style="margin-bottom:.5rem">Digite um limite mensal; a barra fica amarela perto do limite e vermelha quando passa. Os valores já usam as categorias que vocês ajustaram.</div>
         ${limitesHtml}
+        ${semDetalhes > 0.5 ? `<div class="card-subtext" style="margin-top:.5rem">ℹ️ ${brl(semDetalhes)} desta fatura não têm itens detalhados e não entram em nenhuma categoria.</div>` : ''}
       </div>
-      <details style="${estiloBloco}">
+      <details style="${estiloBloco}" ${window.estadoCartao.categoriasAberto ? 'open' : ''} ontoggle="window.estadoCartao.categoriasAberto = this.open">
         <summary style="cursor:pointer;font-weight:700;font-size:.9rem">🏷️ Ajustar categorias${qtdOutros ? ` <span class="badge amber">${qtdOutros} em "Outros"</span>` : ''}</summary>
         <div class="card-subtext" style="margin:.5rem 0">Escolha a categoria certa uma vez; as próximas compras do mesmo lugar já entram nela.</div>
         ${categoriasHtml || '<div class="card-subtext">Sem estabelecimentos nos últimos meses.</div>'}
@@ -4771,8 +4813,8 @@ function renderInsightsBoletos() {
   const rendaMedia = media(mesesRenda.map(m => totaisDoMes(m).entradas));
 
   // Pontualidade (boletos marcados como pagos)
-  const pagos = todosBoletos.filter(b => b.pago && b.dataPagamento && parseDataVencimento(b.dataVencimento));
-  const atrasados = pagos.filter(b => parseDataVencimento(b.dataPagamento) > parseDataVencimento(b.dataVencimento))
+  const pagos = todosBoletos.filter(b => boletoPago(b) && parseDataVencimento(b.dataVencimento));
+  const atrasados = pagos.filter(b => !boletoPagoEmDia(b))
     .sort((a, b) => String(b.dataVencimento).localeCompare(String(a.dataVencimento)));
   const emDia = pagos.length - atrasados.length;
   const pctEmDia = pagos.length ? Math.round(emDia / pagos.length * 100) : null;
@@ -4806,7 +4848,7 @@ function renderInsightsBoletos() {
         <div class="kpi" style="--kpi-cor:#fbbf24">
           <div class="kpi-label"><span>Pagos em dia</span></div>
           <div class="kpi-valor" style="color:#fbbf24">${pctEmDia === null ? '—' : pctEmDia + '%'}</div>
-          <div class="kpi-sub">${pagos.length ? `${emDia} de ${pagos.length} boletos marcados como pagos` : 'Marque os boletos como pagos para acompanhar'}</div>
+          <div class="kpi-sub">${pagos.length ? `${emDia} de ${pagos.length} boletos pagos (até 21/10/2026 contam como em dia)` : 'Marque os boletos como pagos para acompanhar'}</div>
         </div>
       </div>
 
@@ -4882,7 +4924,7 @@ function renderBoletos() {
     });
 
     const totalMes = boletosDoMes.reduce((acc, b) => acc + (b.valorTotal !== undefined ? b.valorTotal : (b.valor || 0)), 0);
-    const qtdPagos = boletosDoMes.filter(b => b.pago).length;
+    const qtdPagos = boletosDoMes.filter(boletoPago).length;
 
     let nomeMesFmt = m;
     if (m !== 'Outros' && m.includes('-')) {
@@ -4978,7 +5020,27 @@ function diasAteVencimento(str) {
 
 // Status do boleto. Boletos muito antigos sem marcação não viram alerta
 // (eram cadastrados antes de existir o controle de pago/em aberto).
+// O controle de pagamento começou em 21/10/2026. Boletos que venceram até essa data
+// contam como pagos em dia, a menos que tenham sido desmarcados manualmente.
+const DATA_INICIO_CONTROLE_PAGAMENTO = '2026-10-21';
+
+function boletoHistorico(b) {
+  const d = parseDataVencimento(b.dataVencimento);
+  return !!d && d <= parseDataVencimento(DATA_INICIO_CONTROLE_PAGAMENTO) && b.pago !== false;
+}
+
+function boletoPago(b) {
+  return b.pago === true || boletoHistorico(b);
+}
+
+function boletoPagoEmDia(b) {
+  if (boletoHistorico(b)) return true;
+  if (!b.pago || !b.dataPagamento) return false;
+  return parseDataVencimento(b.dataPagamento) <= parseDataVencimento(b.dataVencimento);
+}
+
 function statusBoleto(b) {
+  if (boletoHistorico(b) && !b.pago) return { tipo: 'pago', badge: '<span class="badge green">✅ Pago</span>' };
   if (b.pago) return { tipo: 'pago', badge: `<span class="badge green">✅ Pago${b.dataPagamento ? ' em ' + esc(fmtDataVencimento(b.dataPagamento)) : ''}</span>` };
   const dias = diasAteVencimento(b.dataVencimento);
   if (dias === null) return { tipo: 'aberto', badge: `<span class="badge cyan">Em aberto</span>` };
@@ -4991,7 +5053,7 @@ function statusBoleto(b) {
 
 // Botão mostra a SITUAÇÃO ATUAL: verde "Pago" ou "Marcar como pago"
 function botaoPagoBoleto(b) {
-  if (b.pago) {
+  if (boletoPago(b)) {
     return `<button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;background:#059669;color:#fff;border:1px solid #10b981" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="Boleto pago${b.dataPagamento ? ' em ' + esc(fmtDataVencimento(b.dataPagamento)) : ''}. Clique para desmarcar.">✅ Pago</button>`;
   }
   return `<button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;background:transparent;color:var(--text-muted);border:1px dashed #64748b" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="Boleto ainda não pago. Clique para marcar como pago hoje.">⬜ Marcar como pago</button>`;
@@ -5001,7 +5063,7 @@ window.alternarBoletoPago = async function(id) {
   const boleto = todosBoletos.find(b => b.id === id);
   if (!boleto) return;
   try {
-    if (boleto.pago) {
+    if (boletoPago(boleto)) {
       if (!confirm(`Desmarcar o pagamento de "${getNomeBoleto(boleto)}"? Ele voltará a ficar em aberto.`)) return;
       await updateDoc(doc(db, COLL_BOLETOS, id), { pago: false, dataPagamento: deleteField() });
       toastMsg('↩️ Boleto marcado como em aberto.');
@@ -5438,7 +5500,7 @@ document.getElementById('form-config-reservas').addEventListener('submit', async
     metaAnual,
     valorAtualGuardado: guard,
     dataAtualizacao: new Date().toISOString()
-  });
+  }, { merge: true });
   toastMsg('✅ Reservas e configurações de economias salvas!');
   renderTudo();
 });
@@ -5595,6 +5657,444 @@ function renderMovimentacoesReserva() {
     }
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ASSISTENTE FINANCEIRO (aba Reservas) — só lê os dados, exceto a meta de poupança
+// mensal que vocês podem definir (fica em reservas/config)
+// ═══════════════════════════════════════════════════════════════════════════
+const INFO_CATEGORIAS_ASSISTENTE = {
+  'Contas fixas (boletos)': { icone: '🏠', flex: 0 },
+  'Contas variáveis (boletos)': { icone: '💡', flex: 0.15 },
+  'Parcelas do cartão': { icone: '📆', flex: 0 },
+  'Cartão (sem detalhes)': { icone: '💳', flex: 0.5 },
+  'Mercado (débito)': { icone: '🛒', flex: 0.35 },
+  'Supermercado & Alimentação': { icone: '🛒', flex: 0.35 },
+  'Restaurantes & Lazer': { icone: '🍕', flex: 1 },
+  'Eletrônicos & Shopping': { icone: '📱', flex: 1 },
+  'Vestuário & Roupas': { icone: '👗', flex: 1 },
+  'Viagens & Hospedagem': { icone: '✈️', flex: 0.8 },
+  'Assinaturas & Serviços': { icone: '📺', flex: 0.6 },
+  'Transporte & Combustível': { icone: '⛽', flex: 0.3 },
+  'Saúde & Cosméticos': { icone: '💄', flex: 0.25 },
+  'Outros & Diversos': { icone: '📦', flex: 0.7 }
+};
+const CORES_CATEGORIAS = ['#60a5fa', '#a855f7', '#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#94a3b8'];
+const infoCat = nome => INFO_CATEGORIAS_ASSISTENTE[nome] || { icone: '📦', flex: 0.5 };
+
+function mesesBaseAssistente(qtd = 3) {
+  const comEntradas = getMesesDisponiveis().filter(m => m < mesAtualLocal() && totaisDoMes(m).entradas > 0).sort();
+  return comEntradas.slice(-qtd);
+}
+
+// Conta é "fixa" quando o valor quase não muda entre os meses
+function tiposDeConta() {
+  const porConta = {};
+  todosBoletos.forEach(b => {
+    if (!b.mesAno) return;
+    const n = getNomeBoleto(b);
+    (porConta[n] ||= {})[b.mesAno] = (porConta[n][b.mesAno] || 0) + valorDocFinanceiro(b);
+  });
+  const tipos = {};
+  Object.entries(porConta).forEach(([n, porMes]) => {
+    const v = Object.values(porMes);
+    const media = v.reduce((a, x) => a + x, 0) / v.length;
+    const desvio = Math.sqrt(v.reduce((a, x) => a + (x - media) ** 2, 0) / v.length);
+    tipos[n] = v.length >= 2 && media > 0 && desvio / media < 0.05 ? 'fixa' : 'variavel';
+  });
+  return tipos;
+}
+
+// Saídas de um mês separadas por categoria (boletos, cartão por categoria, parcelas, mercado)
+function gastosPorCategoria(m, tipos) {
+  const out = {};
+  const add = (k, v) => { if (v > 0.004) out[k] = (out[k] || 0) + v; };
+  todosBoletos.filter(b => b.mesAno === m).forEach(b =>
+    add(tipos[getNomeBoleto(b)] === 'fixa' ? 'Contas fixas (boletos)' : 'Contas variáveis (boletos)', valorDocFinanceiro(b)));
+  todasFaturas.filter(f => f.mesAno === m).forEach(f => {
+    const itens = (f.itens || []).filter(i => i.valor > 0);
+    const total = valorDocFinanceiro(f);
+    const soma = itens.reduce((a, i) => a + i.valor, 0);
+    const fator = soma > total && total > 0 ? total / soma : 1; // itens somando mais que a fatura (créditos/estornos)
+    itens.forEach(i => add(infoParcela(i.descricao) ? 'Parcelas do cartão' : categorizarItemCartao(i.descricao).nome, i.valor * fator));
+    add('Cartão (sem detalhes)', total - soma * fator);
+  });
+  add('Mercado (débito)', todasCompras.filter(c => c.mesAno === m).reduce((a, c) => a + (c.formasPagamento?.cartaoDebito || 0), 0));
+  return out;
+}
+
+// Parcelas já compradas que vão cair nos próximos meses (pela fatura mais recente de cada cartão)
+function parcelasComprometidas() {
+  const ultima = {};
+  todasFaturas.forEach(f => {
+    const c = f.cartao || f.descricao || 'Cartão';
+    if (f.mesAno && (!ultima[c] || f.mesAno > ultima[c].mesAno)) ultima[c] = f;
+  });
+  const porMes = {};
+  Object.values(ultima).forEach(f => (f.itens || []).forEach(i => {
+    const p = infoParcela(i.descricao);
+    if (!p || p.k >= p.n || !i.valor) return;
+    for (let j = 1; j <= p.n - p.k; j++) {
+      const m = addMeses(f.mesAno, j);
+      porMes[m] = (porMes[m] || 0) + i.valor;
+    }
+  }));
+  return porMes;
+}
+
+// Junta tudo o que o assistente e o relatório precisam
+function analisarFinancas() {
+  const base = mesesBaseAssistente(3);
+  const tipos = tiposDeConta();
+  const N = Math.max(1, base.length);
+  const porMesCat = Object.fromEntries(base.map(m => [m, gastosPorCategoria(m, tipos)]));
+  const mediaCat = {};
+  base.forEach(m => Object.entries(porMesCat[m]).forEach(([k, v]) => { mediaCat[k] = (mediaCat[k] || 0) + v / N; }));
+  const totaisBase = base.map(totaisDoMes);
+  const media = campo => totaisBase.reduce((a, t) => a + t[campo], 0) / N;
+  const rendaMedia = media('entradas');
+  const saidasMedia = media('saidas');
+  const sobraMedia = rendaMedia - saidasMedia;
+
+  // Meta de poupança mensal: definida por vocês > calculada pela meta anual > 10% da renda
+  const mesesAteDez = Math.max(1, 12 - new Date().getMonth());
+  const faltaMeta = Math.max(0, (dadosReservas.metaAnual || 0) - (dadosReservas.valorAtualGuardado || 0));
+  let metaPoupanca, origemMeta;
+  if (dadosReservas.metaPoupancaMensal > 0) { metaPoupanca = dadosReservas.metaPoupancaMensal; origemMeta = 'definida por vocês'; }
+  else if (faltaMeta > 0) { metaPoupanca = faltaMeta / mesesAteDez; origemMeta = `para atingir a meta anual até dezembro`; }
+  else { metaPoupanca = Math.round(rendaMedia * 0.10); origemMeta = 'sugestão: 10% da renda'; }
+
+  // Metas por categoria: distribui o corte necessário pelas categorias mais flexíveis.
+  // Teto de corte proporcional à flexibilidade: lazer/compras até 35%, contas variáveis ~7%
+  const corteNecessario = Math.max(0, metaPoupanca - sobraMedia);
+  const cats = Object.entries(mediaCat).map(([nome, med]) => ({ nome, media: med, ...infoCat(nome) })).sort((a, b) => b.media - a.media);
+  let restante = corteNecessario;
+  const tetoCorte = c => c.media * Math.min(0.35, c.flex * 0.5);
+  for (let rodada = 0; rodada < 6 && restante > 0.5; rodada++) {
+    const elegiveis = cats.filter(c => c.flex > 0 && (c.corte || 0) < tetoCorte(c) - 0.005);
+    const pesoTot = elegiveis.reduce((a, c) => a + c.flex * c.media, 0);
+    if (!pesoTot) break;
+    let distribuido = 0;
+    elegiveis.forEach(c => {
+      const quer = restante * (c.flex * c.media) / pesoTot;
+      const pode = tetoCorte(c) - (c.corte || 0);
+      const corte = Math.min(quer, pode);
+      c.corte = (c.corte || 0) + corte;
+      distribuido += corte;
+    });
+    restante -= distribuido;
+  }
+  cats.forEach(c => { c.corte = c.corte || 0; c.meta = c.media - c.corte; });
+  const faltaMesmoCortando = Math.max(0, restante);
+
+  // Orçamento do mês atual
+  const mesAtual = mesAtualLocal();
+  const tAtual = totaisDoMes(mesAtual);
+  // Renda lançada abaixo de 90% da média = provavelmente falta lançar algum salário: usa a média
+  const rendaDoMes = lancada => lancada >= rendaMedia * 0.9 ? lancada : rendaMedia;
+  const rendaMes = rendaDoMes(tAtual.entradas);
+  const rendaEstimada = rendaMes !== tAtual.entradas;
+  const rendaLancadaMes = tAtual.entradas;
+  const boletosMes = tAtual.boletos || media('boletos');
+  const cartoesMes = tAtual.cartoes || media('cartoes');
+  const mercadoMes = Math.max(tAtual.debito, media('debito'));
+  const comprometidoMes = boletosMes + cartoesMes + mercadoMes;
+  const livreMes = rendaMes - comprometidoMes - metaPoupanca;
+  const hoje = new Date();
+  const diasRestantes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate() - hoje.getDate() + 1;
+
+  // Previsão dos próximos 3 meses (se ajusta sozinha conforme entram dados)
+  const parcelas = parcelasComprometidas();
+  const parcelasMedia = mediaCat['Parcelas do cartão'] || 0;
+  const cartaoSemParcelas = Math.max(0, media('cartoes') - parcelasMedia);
+  const previsao = [1, 2, 3].map(j => {
+    const m = addMeses(mesAtual, j);
+    const t = totaisDoMes(m);
+    const renda = rendaDoMes(t.entradas);
+    const boletos = t.boletos || media('boletos');
+    const cartao = t.cartoes || (cartaoSemParcelas + (parcelas[m] || 0));
+    const mercado = media('debito');
+    return { m, renda, boletos, cartao, mercado, parcelas: parcelas[m] || 0, sobra: renda - boletos - cartao - mercado };
+  });
+
+  // Onde economizar
+  const dicas = [];
+  if (base.length) {
+    if (sobraMedia < 0) dicas.push(['🚨', `Nos últimos ${base.length} meses vocês gastaram em média <b style="color:#fb7185">${brl(-sobraMedia)} a mais do que ganharam</b> por mês.`]);
+    const flexiveis = cats.filter(c => c.flex >= 0.5).sort((a, b) => b.media * b.flex - a.media * a.flex).slice(0, 3);
+    if (flexiveis.length) dicas.push(['✂️', `Onde dá para cortar mais: ${flexiveis.map(c => `<b>${c.nome}</b> (${brl(c.media)}/mês)`).join(', ')}.`]);
+    const ultimo = base[base.length - 1];
+    const anteriores = base.slice(0, -1);
+    if (anteriores.length) {
+      Object.entries(porMesCat[ultimo]).forEach(([k, v]) => {
+        const medAnt = anteriores.reduce((a, m) => a + (porMesCat[m][k] || 0), 0) / anteriores.length;
+        if (medAnt > 0 && v > medAnt * 1.2 && v - medAnt > 50 && infoCat(k).flex > 0) {
+          dicas.push(['📈', `<b>${k}</b> subiu ${brl(v - medAnt)} em ${rotuloMes(ultimo)} (${brl(v)} contra média de ${brl(medAnt)}).`]);
+        }
+      });
+    }
+    if (mediaCat['Assinaturas & Serviços'] > 0) dicas.push(['📺', `Assinaturas custam ${brl(mediaCat['Assinaturas & Serviços'])}/mês (${brl(mediaCat['Assinaturas & Serviços'] * 12)} por ano). Vale revisar as que pouco usam.`]);
+    const parcProx = previsao.reduce((a, x) => a + x.parcelas, 0);
+    if (parcProx > 0) dicas.push(['📆', `Já há ${brl(parcProx)} em parcelas para os próximos 3 meses. Evitem novos parcelamentos até elas diminuírem.`]);
+    if (mediaCat['Restaurantes & Lazer'] > rendaMedia * 0.08) dicas.push(['🍕', `Restaurantes e lazer levam ${Math.round(mediaCat['Restaurantes & Lazer'] / rendaMedia * 100)}% da renda. Trocar 1 saída por semana por refeição em casa já faz diferença.`]);
+    const taxa = rendaMedia ? sobraMedia / rendaMedia * 100 : 0;
+    dicas.push(['🎯', `Taxa de poupança atual: <b style="color:${taxa >= 10 ? '#34d399' : '#fbbf24'}">${taxa.toFixed(0)}%</b> da renda. O recomendado é guardar de 10% a 20%.`]);
+  }
+
+  return { base, N, rendaMedia, saidasMedia, sobraMedia, mediaCat, cats, porMesCat, metaPoupanca, origemMeta, corteNecessario, faltaMesmoCortando,
+    mesAtual, rendaMes, rendaEstimada, rendaLancadaMes, boletosMes, cartoesMes, mercadoMes, comprometidoMes, livreMes, diasRestantes, previsao, dicas, tipos };
+}
+
+window.salvarMetaPoupancaMensal = async function(valor) {
+  const v = parseFloat(String(valor).replace(',', '.'));
+  if (!reservasCarregadas) { toastMsg('⏳ Aguarde, carregando as reservas...'); return; }
+  try {
+    await setDoc(doc(db, COLL_RESERVAS, 'config'), { metaPoupancaMensal: (!isNaN(v) && v > 0) ? v : deleteField() }, { merge: true });
+    toastMsg(!isNaN(v) && v > 0 ? `🎯 Meta de poupança: ${brl(v)}/mês` : '🎯 Meta de poupança automática');
+  } catch (err) {
+    alert('Erro ao salvar a meta: ' + err.message);
+  }
+};
+
+function renderAssistenteFinanceiro() {
+  const el = document.getElementById('assistente-financeiro');
+  if (!el) return;
+  const A = analisarFinancas();
+  if (!A.base.length) {
+    el.innerHTML = `<div class="card" style="margin-bottom:1.5rem"><div class="card-header"><span class="card-title">🧭 Assistente Financeiro</span></div>
+      <div class="empty-state">Assim que houver um mês completo com salários/entradas cadastrados, o assistente monta o orçamento, as metas por categoria e a previsão.</div></div>`;
+    return;
+  }
+
+  const baseTxt = `${rotuloMes(A.base[0])}${A.N > 1 ? ' a ' + rotuloMes(A.base[A.N - 1]) : ''}`;
+  const corLivre = A.livreMes >= 0 ? '#34d399' : '#fb7185';
+  const pct = v => A.rendaMedia ? (v / A.rendaMedia * 100) : 0;
+
+  // "De cada R$ 100 que entram"
+  const fatias = A.cats.slice(0, 9).map((c, i) => ({ ...c, cor: CORES_CATEGORIAS[i] }));
+  const resto = A.cats.slice(9).reduce((a, c) => a + c.media, 0);
+  if (resto > 0) fatias.push({ nome: 'Demais categorias', icone: '➕', media: resto, cor: CORES_CATEGORIAS[9] });
+  const sobraPos = Math.max(0, A.sobraMedia);
+  const baseBarra = Math.max(A.rendaMedia, A.saidasMedia) || 1;
+  const maiorFatia = fatias[0];
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1.25rem;border-color:rgba(255,197,50,.45)">
+      <div class="card-header">
+        <div>
+          <span class="card-title" style="color:#ffd766">🧭 Assistente Financeiro</span>
+          <p class="card-subtext" style="margin-top:.2rem">Baseado em ${baseTxt} (meses completos). Se ajusta sozinho a cada novo lançamento.</p>
+        </div>
+        <button class="btn-secondary" style="padding:.45rem .8rem;font-size:.82rem" onclick="abrirRelatorioMensal()">📑 Relatório do mês</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi" style="--kpi-cor:${corLivre}">
+          <div class="kpi-label"><span>Pode gastar em ${rotuloMes(A.mesAtual)}</span></div>
+          <div class="kpi-valor" style="color:${corLivre}">${A.livreMes >= 0 ? brl(A.livreMes) : '− ' + brl(-A.livreMes)}</div>
+          <div class="kpi-sub">${A.livreMes >= 0 ? `≈ ${brl(A.livreMes / A.diasRestantes)} por dia até o fim do mês, já guardando a meta` : 'O mês já passou do orçamento considerando a meta de poupança'}</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:${A.sobraMedia >= 0 ? '#60a5fa' : '#f43f5e'}">
+          <div class="kpi-label"><span>Sobra média/mês</span></div>
+          <div class="kpi-valor" style="color:${A.sobraMedia >= 0 ? '#60a5fa' : '#fb7185'}">${brl(A.sobraMedia)}</div>
+          <div class="kpi-sub">Renda ${brl(A.rendaMedia)} − saídas ${brl(A.saidasMedia)}</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:#fbbf24">
+          <div class="kpi-label"><span>Meta de poupança/mês</span></div>
+          <div class="kpi-valor" style="color:#fbbf24">${brl(A.metaPoupanca)}</div>
+          <div class="kpi-sub">${A.origemMeta}</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:${A.corteNecessario > 0 ? '#f43f5e' : '#10b981'}">
+          <div class="kpi-label"><span>Precisa economizar</span></div>
+          <div class="kpi-valor" style="color:${A.corteNecessario > 0 ? '#fb7185' : '#34d399'}">${A.corteNecessario > 0 ? brl(A.corteNecessario) : 'Nada 🎉'}</div>
+          <div class="kpi-sub">${A.corteNecessario > 0 ? 'por mês para alcançar a meta de poupança' : 'a sobra média já cobre a meta'}</div>
+        </div>
+      </div>
+
+      <div style="${estiloBloco};margin-bottom:1rem">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">📅 Orçamento de ${rotuloMes(A.mesAtual, true)}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;font-size:.84rem">
+          <div><span class="card-subtext">Renda${A.rendaEstimada ? ' (média)' : ''}</span><div style="font-weight:700;color:#34d399">${brl(A.rendaMes)}</div>${A.rendaEstimada ? `<div class="card-subtext">lançado até agora: ${brl(A.rendaLancadaMes)}</div>` : ''}</div>
+          <div><span class="card-subtext">Boletos</span><div style="font-weight:700">− ${brl(A.boletosMes)}</div></div>
+          <div><span class="card-subtext">Faturas do cartão</span><div style="font-weight:700">− ${brl(A.cartoesMes)}</div></div>
+          <div><span class="card-subtext">Mercado (débito)</span><div style="font-weight:700">− ${brl(A.mercadoMes)}</div></div>
+          <div><span class="card-subtext">Guardar (meta)</span><div style="font-weight:700;color:#fbbf24">− ${brl(A.metaPoupanca)}</div></div>
+          <div><span class="card-subtext">Livre para gastar</span><div style="font-weight:800;color:${corLivre}">${brl(A.livreMes)}</div></div>
+        </div>
+        <p class="card-subtext" style="margin-top:.6rem">Valores ainda não lançados no mês usam a média. Compras novas no cartão caem na fatura do mês seguinte — usem o "livre para gastar" como teto.</p>
+      </div>
+
+      <div style="${estiloBloco};margin-bottom:1rem">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.35rem">💸 Para onde vai o dinheiro (média por mês)</div>
+        <p class="card-subtext" style="margin-bottom:.6rem">De cada <b>R$ 100</b> que entram, <b>R$ ${pct(maiorFatia?.media || 0).toFixed(0)}</b> vão para ${maiorFatia ? maiorFatia.nome : '—'}${A.sobraMedia >= 0 ? ` e sobram <b style="color:#34d399">R$ ${pct(A.sobraMedia).toFixed(0)}</b>` : `, e falta <b style="color:#fb7185">R$ ${pct(-A.sobraMedia).toFixed(0)}</b>`}.</p>
+        <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.06);margin-bottom:.75rem">
+          ${fatias.map(f => `<span title="${f.nome}: ${brl(f.media)}" style="width:${f.media / baseBarra * 100}%;background:${f.cor}"></span>`).join('')}
+          ${sobraPos > 0 ? `<span title="Sobra: ${brl(sobraPos)}" style="width:${sobraPos / baseBarra * 100}%;background:repeating-linear-gradient(45deg,#34d399,#34d399 4px,#059669 4px,#059669 8px)"></span>` : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.35rem .9rem">
+          ${fatias.map(f => `
+            <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.82rem">
+              <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${f.cor};margin-right:.35rem"></span>${f.icone} ${f.nome}</span>
+              <span style="white-space:nowrap"><b>${brl(f.media)}</b> <span class="card-subtext">${pct(f.media).toFixed(0)}%</span></span>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="dash-grid-2" style="margin-bottom:1rem">
+        <div style="${estiloBloco}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
+            <div style="font-weight:700;font-size:.9rem">🎯 Metas de gasto por categoria</div>
+            <label class="card-subtext" style="display:flex;align-items:center;gap:.35rem">Guardar por mês R$
+              <input type="number" min="0" step="50" value="${dadosReservas.metaPoupancaMensal || ''}" placeholder="${Math.round(A.metaPoupanca)}" class="form-control" style="width:110px;padding:.3rem .5rem;font-size:.82rem" onchange="salvarMetaPoupancaMensal(this.value)" aria-label="Meta de poupança mensal">
+            </label>
+          </div>
+          <p class="card-subtext" style="margin-bottom:.5rem">Tetos mensais compatíveis com o que vocês já gastam, cortando mais onde é mais fácil (lazer, compras) e nada nas contas fixas e parcelas.</p>
+          <div class="table-responsive"><table class="custom-table">
+            <thead><tr><th>Categoria</th><th class="num">Média</th><th class="num">Meta</th><th class="num">Economia</th></tr></thead>
+            <tbody>${A.cats.map(c => `
+              <tr>
+                <td>${c.icone} ${c.nome}${c.flex === 0 ? ' <span class="badge cyan" style="font-size:.62rem">fixo</span>' : ''}</td>
+                <td class="num">${brl(c.media)}</td>
+                <td class="num"><b>${brl(c.meta)}</b></td>
+                <td class="num" style="color:${c.corte > 0.5 ? '#34d399' : 'var(--text-muted)'}">${c.corte > 0.5 ? '− ' + brl(c.corte) : '—'}</td>
+              </tr>`).join('')}</tbody>
+            <tfoot><tr><td>Total</td><td class="num">${brl(A.cats.reduce((a, c) => a + c.media, 0))}</td><td class="num">${brl(A.cats.reduce((a, c) => a + c.meta, 0))}</td><td class="num" style="color:#34d399">− ${brl(A.cats.reduce((a, c) => a + c.corte, 0))}</td></tr></tfoot>
+          </table></div>
+          ${A.faltaMesmoCortando > 0.5 ? `<p class="card-subtext" style="margin-top:.5rem;color:#fbbf24">⚠️ Mesmo cortando o máximo razoável de cada categoria, ainda faltariam ${brl(A.faltaMesmoCortando)}/mês. Considerem uma meta de poupança menor ou rever contas fixas.</p>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem">
+          <div style="${estiloBloco}">
+            <div style="font-weight:700;font-size:.9rem;margin-bottom:.4rem">💡 Onde economizar</div>
+            ${A.dicas.map(([i, t]) => `<div class="destaque-item"><span>${i}</span><div>${t}</div></div>`).join('')}
+          </div>
+          <div style="${estiloBloco}">
+            <div style="font-weight:700;font-size:.9rem;margin-bottom:.4rem">🔮 Previsão dos próximos meses</div>
+            ${A.previsao.map(x => `
+              <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.84rem;padding:.4rem 0;border-top:1px solid rgba(255,255,255,.05)">
+                <div><b>${rotuloMes(x.m, true)}</b><div class="card-subtext">Renda ${brl(x.renda)} · saídas ${brl(x.boletos + x.cartao + x.mercado)}${x.parcelas ? ` (inclui ${brl(x.parcelas)} em parcelas)` : ''}</div></div>
+                <b style="color:${x.sobra >= A.metaPoupanca ? '#34d399' : x.sobra >= 0 ? '#fbbf24' : '#fb7185'};white-space:nowrap">${brl(x.sobra)}</b>
+              </div>`).join('')}
+            <p class="card-subtext" style="margin-top:.4rem">Verde: dá para guardar a meta · amarelo: sobra menos que a meta · vermelho: falta dinheiro.</p>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══ RELATÓRIO MENSAL (fica pronto a partir do dia 05, sobre o mês anterior) ═══
+function mesDoRelatorio() {
+  return addMeses(mesAtualLocal(), -1);
+}
+
+function renderAvisoRelatorio() {
+  const el = document.getElementById('aviso-relatorio');
+  if (!el) return;
+  const m = mesDoRelatorio();
+  let dispensado = false;
+  try { dispensado = localStorage.getItem('relatorioVisto.' + m) === '1'; } catch {}
+  const temDados = totaisDoMes(m).entradas > 0 || totaisDoMes(m).saidas > 0;
+  if (new Date().getDate() < 5 || dispensado || !temDados) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1.25rem;border-color:rgba(255,197,50,.5);display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <div><b>📑 O relatório de ${rotuloMes(m, true)} está pronto</b><div class="card-subtext">Resumo do mês, para onde foi o dinheiro, alertas e metas para este mês.</div></div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn-primary" style="padding:.5rem .9rem;font-size:.85rem" onclick="abrirRelatorioMensal('${m}')">Abrir relatório</button>
+        <button class="btn-secondary" style="padding:.5rem .9rem;font-size:.85rem" onclick="dispensarAvisoRelatorio('${m}')">Dispensar</button>
+      </div>
+    </div>`;
+}
+
+window.dispensarAvisoRelatorio = function(m) {
+  try { localStorage.setItem('relatorioVisto.' + m, '1'); } catch {}
+  renderAvisoRelatorio();
+};
+
+window.abrirRelatorioMensal = function(mesParam) {
+  const m = mesParam || mesDoRelatorio();
+  try { localStorage.setItem('relatorioVisto.' + m, '1'); } catch {}
+  const A = analisarFinancas();
+  const tipos = A.tipos;
+  const t = totaisDoMes(m);
+  const anteriores = getMesesDisponiveis().filter(x => x < m && totaisDoMes(x).entradas > 0).sort().slice(-3);
+  const mediaAnt = campo => anteriores.length ? anteriores.reduce((a, x) => a + totaisDoMes(x)[campo], 0) / anteriores.length : 0;
+  const catMes = gastosPorCategoria(m, tipos);
+  const catsMesOrd = Object.entries(catMes).sort((a, b) => b[1] - a[1]);
+  const mediaCatAnt = {};
+  anteriores.forEach(x => Object.entries(gastosPorCategoria(x, tipos)).forEach(([k, v]) => { mediaCatAnt[k] = (mediaCatAnt[k] || 0) + v / anteriores.length; }));
+  const taxa = t.entradas ? (t.saldo / t.entradas * 100) : 0;
+  const comparar = (v, ref, maiorMelhor) => {
+    if (!ref) return '';
+    const d = (v - ref) / Math.abs(ref) * 100;
+    if (Math.abs(d) < 0.5) return '<span style="color:#64748b">= 0%</span>';
+    const bom = (d > 0) === maiorMelhor;
+    return `<span style="color:${Math.abs(d) < 0.5 ? '#64748b' : bom ? '#059669' : '#dc2626'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(0)}%</span>`;
+  };
+  const limites = configCartoes.limites || {};
+  const estourados = [...CATEGORIAS_CARTAO, CATEGORIA_OUTROS].filter(c => limites[chaveRegra(c.nome)] && (catMes[c.nome] || 0) > limites[chaveRegra(c.nome)]);
+  const guardado = dadosReservas.valorAtualGuardado || 0;
+  const metaAnual = dadosReservas.metaAnual || 0;
+
+  const w = window.open('', '_blank', 'width=900,height=800');
+  if (!w) { alert('Permita pop-ups no navegador para abrir o relatório.'); return; }
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${rotuloMes(m, true)}</title>
+    <style>
+      body{font-family:system-ui,-apple-system,sans-serif;color:#0f172a;padding:28px;margin:0;background:#fff;font-size:13px;line-height:1.5}
+      h1{font-size:20px;margin:0} h2{font-size:15px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0}
+      .topo{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0f172a;padding-bottom:10px;margin-bottom:14px}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+      .box{border:1px solid #cbd5e1;border-radius:8px;padding:10px;background:#f8fafc}
+      .box .l{font-size:10px;text-transform:uppercase;color:#64748b;font-weight:700}.box .v{font-size:16px;font-weight:800;margin-top:2px}
+      table{width:100%;border-collapse:collapse} td,th{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left} th{background:#f1f5f9;font-size:11px;text-transform:uppercase;color:#475569}
+      .num{text-align:right;white-space:nowrap} li{margin:4px 0} .muted{color:#64748b}
+      @media print{body{padding:0}}
+    </style></head><body>
+    <div class="topo"><div><h1>📑 Relatório Financeiro — ${rotuloMes(m, true)}</h1><div class="muted">Victor &amp; Maria · gerado em ${new Date().toLocaleDateString('pt-BR')}</div></div><img src="${location.href.replace(/[^/]*$/, '')}icons/logo.png" style="width:52px;height:52px;border-radius:12px"></div>
+
+    <h2>Resumo do mês</h2>
+    <div class="grid">
+      <div class="box"><div class="l">Entradas</div><div class="v" style="color:#059669">${brl(t.entradas)}</div><div class="muted">${comparar(t.entradas, mediaAnt('entradas'), true)} vs média</div></div>
+      <div class="box"><div class="l">Saídas</div><div class="v" style="color:#dc2626">${brl(t.saidas)}</div><div class="muted">${comparar(t.saidas, mediaAnt('saidas'), false)} vs média</div></div>
+      <div class="box"><div class="l">Sobra</div><div class="v" style="color:${t.saldo >= 0 ? '#2563eb' : '#dc2626'}">${brl(t.saldo)}</div><div class="muted">${taxa.toFixed(0)}% da renda</div></div>
+      <div class="box"><div class="l">Meta de poupança</div><div class="v" style="color:#b45309">${brl(A.metaPoupanca)}</div><div class="muted">${t.saldo >= A.metaPoupanca ? '✅ atingida' : '❌ não atingida'}</div></div>
+    </div>
+    <p class="muted" style="margin-top:8px">Saídas: cartões ${brl(t.cartoes)} · boletos ${brl(t.boletos)} · mercado (débito) ${brl(t.debito)}. Média dos meses anteriores: ${anteriores.length ? anteriores.map(x => rotuloMes(x)).join(', ') : 'sem histórico'}.</p>
+
+    <h2>Para onde foi o dinheiro</h2>
+    <table><thead><tr><th>Categoria</th><th class="num">${rotuloMes(m)}</th><th class="num">% da renda</th><th class="num">Média anterior</th><th class="num">Variação</th></tr></thead><tbody>
+      ${catsMesOrd.map(([k, v]) => `<tr><td>${infoCat(k).icone} ${k}</td><td class="num"><b>${brl(v)}</b></td><td class="num">${t.entradas ? (v / t.entradas * 100).toFixed(0) + '%' : '—'}</td><td class="num">${mediaCatAnt[k] ? brl(mediaCatAnt[k]) : '—'}</td><td class="num">${comparar(v, mediaCatAnt[k], false)}</td></tr>`).join('')}
+    </tbody></table>
+
+    <h2>Alertas</h2>
+    <ul>
+      ${t.saldo < 0 ? `<li>🚨 O mês fechou no vermelho: ${brl(-t.saldo)} a mais de saídas do que entradas.</li>` : ''}
+      ${estourados.map(c => `<li>🎯 Limite estourado em <b>${c.nome}</b>: ${brl(catMes[c.nome])} de ${brl(limites[chaveRegra(c.nome)])}.</li>`).join('')}
+      ${catsMesOrd.filter(([k, v]) => mediaCatAnt[k] > 0 && v > mediaCatAnt[k] * 1.2 && v - mediaCatAnt[k] > 50 && infoCat(k).flex > 0).map(([k, v]) => `<li>📈 <b>${k}</b> ficou ${brl(v - mediaCatAnt[k])} acima da média.</li>`).join('')}
+      ${todosBoletos.filter(b => b.mesAno === m && !boletoPago(b)).map(b => `<li>📄 Boleto em aberto: <b>${esc(getNomeBoleto(b))}</b> (${brl(valorDocFinanceiro(b))}, venc. ${fmtDataVencimento(b.dataVencimento)}).</li>`).join('')}
+    </ul>
+
+    <h2>Reservas</h2>
+    <p>Guardado: <b>${brl(guardado)}</b>${metaAnual ? ` de ${brl(metaAnual)} (${Math.min(100, guardado / metaAnual * 100).toFixed(0)}% da meta anual)` : ''}. Movimentações no mês: ${movimentacoesReserva.filter(x => String(x.data).startsWith(m)).map(x => `${x.tipo === 'deposito' ? '+' : '−'}${brl(x.valor)}`).join(', ') || 'nenhuma registrada'}.</p>
+
+    <h2>Metas para ${rotuloMes(addMeses(m, 1), true)}</h2>
+    <p>Para guardar <b>${brl(A.metaPoupanca)}</b> por mês (${A.origemMeta}), os tetos sugeridos são:</p>
+    <table><thead><tr><th>Categoria</th><th class="num">Média</th><th class="num">Meta</th><th class="num">Economia</th></tr></thead><tbody>
+      ${A.cats.map(c => `<tr><td>${c.icone} ${c.nome}</td><td class="num">${brl(c.media)}</td><td class="num"><b>${brl(c.meta)}</b></td><td class="num">${c.corte > 0.5 ? '− ' + brl(c.corte) : '—'}</td></tr>`).join('')}
+    </tbody></table>
+
+    <h2>Recomendações</h2>
+    <ul>${A.dicas.map(([i, txt]) => `<li>${i} ${txt}</li>`).join('')}</ul>
+
+    <h2>Previsão</h2>
+    <table><thead><tr><th>Mês</th><th class="num">Renda</th><th class="num">Saídas previstas</th><th class="num">Sobra prevista</th></tr></thead><tbody>
+      ${A.previsao.map(x => `<tr><td>${rotuloMes(x.m, true)}</td><td class="num">${brl(x.renda)}</td><td class="num">${brl(x.boletos + x.cartao + x.mercado)}</td><td class="num"><b>${brl(x.sobra)}</b></td></tr>`).join('')}
+    </tbody></table>
+
+    <p class="muted" style="margin-top:20px">Para salvar em PDF: use Imprimir → "Salvar como PDF".</p>
+    <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
+    </body></html>`);
+  w.document.close();
+  renderAvisoRelatorio();
+};
 
 function renderReservasEEconomias() {
   // Sem valores inventados: se não foram cadastrados, ficam em zero
@@ -6230,7 +6730,7 @@ function gastoMercadoNoMes(m) {
 }
 
 // Calcula a previsão para `mesAlvo` usando só meses anteriores a `mesLimite` (exclusivo)
-function calcularPrevisaoMercado(mesLimite) {
+function calcularPrevisaoMercado(mesLimite, mesAlvo = mesLimite) {
   const comprasBase0 = todasCompras.filter(c => c.mesAno && c.mesAno < mesLimite);
   const mesesBase = [...new Set(comprasBase0.map(c => c.mesAno))].sort().slice(-MESES_BASE_PREVISAO);
   if (!mesesBase.length) return null;
@@ -6294,8 +6794,20 @@ function calcularPrevisaoMercado(mesLimite) {
   }));
 
   const essenciais = [];
+  const ocasionais = [];
   const ocasionaisPorMes = {};
   let qtdOcasionais = 0;
+
+  // Compras entre o fim da base e o mês-alvo (ex: mês atual incompleto) só servem
+  // para saber se um item ocasional já foi comprado recentemente
+  const ultimoBase = mesesBase[N - 1];
+  todasCompras.filter(c => c.mesAno && c.mesAno > ultimoBase && c.mesAno < mesAlvo).forEach(c => (c.itens || []).forEach(item => {
+    const k = 'n:' + normalizarTextoProduto(item.nome);
+    if (!pai[k]) return;
+    const g = grupos[achar(k)];
+    if (g && (!g.ultimaForaBase || c.mesAno > g.ultimaForaBase)) g.ultimaForaBase = c.mesAno;
+  }));
+  const idxMes = m => { const [a, mm] = m.split('-').map(Number); return a * 12 + mm; };
   Object.values(grupos).forEach(g => {
     const mesesComCompra = Object.keys(g.qtdPorMes).length;
     const qtdMedia = mediaPonderada(g.qtdPorMes);
@@ -6305,6 +6817,25 @@ function calcularPrevisaoMercado(mesLimite) {
     if (!essencial) {
       qtdOcasionais++;
       Object.entries(g.valorPorMes).forEach(([m, v]) => { ocasionaisPorMes[m] = (ocasionaisPorMes[m] || 0) + v; });
+
+      // Chance de precisar no mês-alvo: pelo intervalo médio entre compras e há quanto tempo foi a última
+      const mesesCompra = Object.keys(g.qtdPorMes).sort();
+      const vezes = mesesCompra.length;
+      const ultima = g.ultimaForaBase || mesesCompra[vezes - 1];
+      const desde = idxMes(mesAlvo) - idxMes(ultima);
+      const intervalo = vezes >= 2 ? (idxMes(mesesCompra[vezes - 1]) - idxMes(mesesCompra[0])) / (vezes - 1) : null;
+      let chance = intervalo ? Math.min(1, desde / Math.max(1, intervalo)) : Math.min(0.5, vezes / N);
+      if (g.ultimaForaBase && desde <= 1 && (!intervalo || intervalo > 1)) chance = Math.min(chance, 0.2); // comprado agora há pouco
+      chance = Math.max(0.1, chance);
+      const totalQtd = Object.values(g.qtdPorMes).reduce((a, q) => a + q, 0);
+      const qtdPorCompra = totalQtd / vezes;
+      const qtdOc = g.porPeso ? Math.max(0.1, Math.round(qtdPorCompra * 10) / 10) : Math.max(1, Math.round(qtdPorCompra));
+      const precoOc = g.ultimoPreco || (Object.values(g.valorPorMes).reduce((a, v) => a + v, 0) / (totalQtd || 1));
+      ocasionais.push({
+        nome: g.nome, marca: g.marca, secao: secaoDoProduto(g.nome), porPeso: g.porPeso,
+        qtd: qtdOc, preco: precoOc, subtotal: qtdOc * precoOc,
+        vezes, intervalo, ultima, chance, provavel: chance >= 0.75
+      });
       return;
     }
     const qtd = g.porPeso ? Math.max(0.1, Math.round(qtdMedia * 10) / 10) : Math.max(1, Math.round(qtdMedia));
@@ -6332,7 +6863,8 @@ function calcularPrevisaoMercado(mesLimite) {
   return {
     mesesBase, N, fatorDesconto,
     gastoMedioReal: mediaPonderada(gastoPorMes),
-    essenciais, totalEssenciais, reservaOcasionais, qtdOcasionais, descontoEstimado, comprasSemItens, total
+    essenciais, totalEssenciais, reservaOcasionais, qtdOcasionais, descontoEstimado, comprasSemItens, total,
+    ocasionais: ocasionais.sort((a, b) => b.chance - a.chance || b.subtotal - a.subtotal)
   };
 }
 
@@ -6352,11 +6884,12 @@ function renderListaMensal() {
   const credDisponivel = diasUteis * credPorDia;
 
   const mesAtual = mesAtualLocal();
-  let prev = calcularPrevisaoMercado(mesAtual);
+  const mesDaLista = addMeses(mesAtual, 1);
+  let prev = calcularPrevisaoMercado(mesAtual, mesDaLista);
   let baseParcial = false;
   if (!prev) {
     // Só existe o mês atual: usa ele mesmo, avisando que a base é parcial
-    prev = calcularPrevisaoMercado('9999-99');
+    prev = calcularPrevisaoMercado('9999-99', mesDaLista);
     baseParcial = true;
   }
 
@@ -6396,10 +6929,24 @@ function renderListaMensal() {
   const fmtQtd = i => i.porPeso ? `${i.qtd.toFixed(1).replace('.', ',')} kg` : `${i.qtd} un`;
   const freqTxt = i => i.mesesComCompra >= i.totalMeses ? 'Todo mês' : `${i.mesesComCompra} de ${i.totalMeses} meses`;
   const difMedia = prev.gastoMedioReal ? ((total - prev.gastoMedioReal) / prev.gastoMedioReal) * 100 : 0;
+  const provaveis = prev.ocasionais.filter(o => o.provavel);
+  const talvez = prev.ocasionais.filter(o => !o.provavel).slice(0, 15);
+  const ritmoTxt = o => o.intervalo ? `a cada ~${o.intervalo.toFixed(o.intervalo % 1 ? 1 : 0).replace('.', ',')} ${o.intervalo >= 2 ? 'meses' : 'mês'} · última ${rotuloMes(o.ultima)}` : `comprado ${o.vezes}x · última ${rotuloMes(o.ultima)}`;
+  const linhaOcasional = o => `
+    <tr>
+      <td><strong>${esc(o.nome)}</strong> <span class="badge ${o.provavel ? 'green' : 'amber'}" style="font-size:.64rem">${o.provavel ? 'Provável' : 'Talvez'} ${Math.round(o.chance * 100)}%</span>
+        <div class="card-subtext">${ritmoTxt(o)}</div>
+        <div class="card-subtext so-celular">${brl(o.preco)}${o.porPeso ? '/kg' : ''}</div></td>
+      <td class="col-pc"><span class="badge cyan">${o.secao}</span></td>
+      <td class="num"><strong>${fmtQtd(o)}</strong></td>
+      <td class="num col-pc">${brl(o.preco)}${o.porPeso ? '/kg' : ''}</td>
+      <td class="num" style="color:var(--text-muted)">${brl(o.subtotal)}</td>
+    </tr>`;
 
   window.dadosListaMensalCache = {
     mesAnoStr, diasUteis, total, cobertoAlim, cobertoCred, cobertoDeb, secoes,
     reservaOcasionais: prev.reservaOcasionais, qtdOcasionais: prev.qtdOcasionais, descontoEstimado: prev.descontoEstimado,
+    provaveis, talvez,
     comprasSemItens: prev.comprasSemItens, baseTxt
   };
 
@@ -6472,9 +7019,12 @@ function renderListaMensal() {
                   <td class="num col-pc">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
                   <td class="num"><strong>${brl(i.subtotal)}</strong></td>
                 </tr>`).join('')}`).join('')}
-            <tr><td colspan="5" style="background:rgba(0,0,0,.2);font-weight:800;font-size:.8rem">🧺 Ocasionais</td></tr>
+            <tr><td colspan="5" style="background:rgba(0,0,0,.2);font-weight:800;font-size:.8rem">🧺 Ocasionais — prováveis em ${mesAnoStr.split(' de ')[0]} <span style="float:right;color:var(--text-muted)">${provaveis.length} itens</span></td></tr>
+            ${provaveis.map(linhaOcasional).join('') || '<tr><td colspan="5" class="card-subtext">Nenhum item ocasional "vencendo" neste mês.</td></tr>'}
+            ${talvez.length ? `<tr><td colspan="5" style="background:rgba(0,0,0,.2);font-weight:800;font-size:.8rem">🤔 Ocasionais — talvez (confiram se precisa) <span style="float:right;color:var(--text-muted)">${talvez.length} itens</span></td></tr>
+            ${talvez.map(linhaOcasional).join('')}` : ''}
             <tr>
-              <td><strong>Reserva para itens ocasionais</strong><div class="card-subtext">${prev.qtdOcasionais} itens comprados de vez em quando</div></td>
+              <td><strong>Valor previsto para os ocasionais</strong><div class="card-subtext">Nem todo ocasional é comprado todo mês; no total entra a média que vocês realmente gastam com eles</div></td>
               <td class="col-pc"><span class="badge purple">Média mensal</span></td>
               <td class="num">—</td><td class="num col-pc">—</td>
               <td class="num"><strong>${brl(prev.reservaOcasionais)}</strong></td>
@@ -6575,10 +7125,31 @@ window.exportarPDFListaMensal = function() {
             </tr>`).join('')}
         </tbody></table>`).join('')}
 
-      <h2><span>🧺 Ocasionais</span><span>${brl(d.reservaOcasionais + d.comprasSemItens)}</span></h2>
+      ${(d.provaveis || []).length ? `
+      <h2><span>🧺 Ocasionais — prováveis este mês</span><span></span></h2>
       <table><tbody>
-        <tr><td class="check-col"></td><td>Reserva para itens ocasionais (${d.qtdOcasionais} itens comprados de vez em quando)</td><td class="num"><strong>${brl(d.reservaOcasionais + d.comprasSemItens)}</strong></td></tr>
-      </tbody></table>
+        ${d.provaveis.map(i => `
+          <tr>
+            <td class="check-col"><div class="chk-box"></div></td>
+            <td><strong>${esc(i.nome)}</strong></td>
+            <td class="num"><strong>${fmtQtd(i)}</strong></td>
+            <td class="num">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
+            <td class="num">${brl(i.subtotal)}</td>
+          </tr>`).join('')}
+      </tbody></table>` : ''}
+      ${(d.talvez || []).length ? `
+      <h2><span>🤔 Ocasionais — talvez (confiram se precisa)</span><span></span></h2>
+      <table><tbody>
+        ${d.talvez.map(i => `
+          <tr>
+            <td class="check-col"><div class="chk-box"></div></td>
+            <td>${esc(i.nome)}</td>
+            <td class="num">${fmtQtd(i)}</td>
+            <td class="num">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
+            <td class="num">${brl(i.subtotal)}</td>
+          </tr>`).join('')}
+      </tbody></table>` : ''}
+      <p style="font-size:12px;color:#475569;margin-top:10px">🧺 Valor previsto para os ocasionais (média real do que vocês gastam com eles): <strong>${brl(d.reservaOcasionais + d.comprasSemItens)}</strong></p>
       ${d.descontoEstimado > 0.005 ? `<p style="font-size:12px;color:#475569;margin-top:10px">💸 Desconto médio nas notas: − ${brl(d.descontoEstimado)}</p>` : ''}
 
       <div class="total-footer">
