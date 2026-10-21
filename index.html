@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Controle Financeiro Completo — Victor &amp; Maria</title>
   <meta name="description" content="Sistema completo de gestão financeira pessoal: Salários/Holerites, Cartões de Crédito, Mercado, Reservas e Orçamento Familiar.">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Finanças V&amp;M">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -48,9 +55,12 @@
 
     /* Mobile Nav */
     .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(30,41,59,.97);backdrop-filter:blur(16px);border-top:1px solid var(--border-color);padding:.4rem .2rem;justify-content:space-around}
-    .mob-btn{background:transparent;border:none;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.65rem;font-weight:500;padding:.35rem;border-radius:var(--radius-sm);cursor:pointer;flex:1;font-family:inherit}
+    .mob-btn{background:transparent;border:none;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.72rem;min-height:48px;justify-content:center;font-weight:500;padding:.35rem;border-radius:var(--radius-sm);cursor:pointer;flex:1;font-family:inherit}
     .mob-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
     .mob-btn.active{color:var(--primary)}
+    .mob-mais-menu{display:none;position:absolute;bottom:calc(100% + .5rem);right:.5rem;left:.5rem;background:rgba(30,41,59,.98);backdrop-filter:blur(16px);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:.6rem;grid-template-columns:repeat(4,1fr);gap:.35rem;box-shadow:var(--shadow-card)}
+    .mob-mais-menu.open{display:grid}
+    .mob-mais-menu .mob-btn{padding:.6rem .25rem;font-size:.72rem}
 
     @media(max-width:850px){.desktop-nav{display:none}.mobile-nav{display:flex}.app-header{padding:.8rem 1rem}}
 
@@ -223,6 +233,21 @@
 </head>
 <body>
 
+<!-- TELA DE LOGIN -->
+<div id="tela-login" style="position:fixed;inset:0;z-index:3000;background:var(--bg-dark);display:flex;align-items:center;justify-content:center;padding:1rem">
+  <div class="card" style="max-width:400px;width:100%;text-align:center;padding:2rem 1.5rem">
+    <div class="logo-icon" style="margin:0 auto 1rem;width:64px;height:64px;font-size:2rem">💼</div>
+    <h1 style="font-size:1.35rem;font-weight:800;margin-bottom:.25rem">Controle Financeiro</h1>
+    <p style="color:var(--text-muted);font-size:.9rem;margin-bottom:1.5rem">Victor &amp; Maria</p>
+    <p id="login-msg" style="color:var(--text-muted);font-size:.88rem;margin-bottom:1.25rem;min-height:1.4em">⏳ Verificando acesso...</p>
+    <button id="btn-login-google" class="btn-primary" onclick="entrarComGoogle()" style="display:none;width:100%;padding:.85rem">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Entrar com Google
+    </button>
+    <button id="btn-login-trocar" class="btn-secondary" onclick="trocarDeConta()" style="display:none;width:100%;padding:.85rem">🔄 Entrar com outra conta</button>
+  </div>
+</div>
+
 <!-- HEADER -->
 <header class="app-header">
   <div class="logo-container">
@@ -243,6 +268,11 @@
     <button class="nav-item" data-tab="estimativa">🔮 Estimativa de Custos</button>
     <button class="nav-item" data-tab="reservas">🐷 Reservas &amp; Economias</button>
   </nav>
+
+  <div id="usuario-logado" style="display:none;align-items:center;gap:.5rem;flex-shrink:0">
+    <span id="usuario-nome" style="font-size:.82rem;color:var(--text-muted);font-weight:600"></span>
+    <button class="btn-secondary" onclick="sairDaConta()" style="padding:.4rem .7rem;font-size:.78rem" title="Sair da conta">Sair</button>
+  </div>
 </header>
 
 <!-- MAIN -->
@@ -252,6 +282,9 @@
   <!-- 1. ABA DASHBOARD (VISÃO GERAL DO CONTROLE FINANCEIRO COMPLETO) -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
   <section id="tab-dashboard" class="tab-content active">
+    <!-- Alertas de vencimento de boletos -->
+    <div id="alertas-vencimento"></div>
+
     <!-- Grade de Resumo Geral -->
     <div class="grid-summary">
       <div class="card">
@@ -320,6 +353,9 @@
       <button class="btn-secondary" id="btn-exportar-backup" onclick="exportarBackupJSON()" style="padding:.9rem" title="Baixa uma cópia de todos os dados do banco em um arquivo JSON">
         💾 Exportar Backup (JSON)
       </button>
+      <button class="btn-secondary" id="btn-abrir-lixeira" onclick="abrirLixeira()" style="padding:.9rem" title="Registros excluídos que podem ser restaurados">
+        🗑️ Lixeira
+      </button>
     </div>
 
     <!-- Card Detalhamento do Orçamento do Mercado (Alimentação, Crédito e Débito) -->
@@ -342,6 +378,15 @@
           <div class="p-val" id="dash-debito" style="color:#fbbf24">R$ 0,00</div>
         </div>
       </div>
+    </div>
+
+    <!-- Gráfico Entradas x Saídas por Mês -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header">
+        <span class="card-title">📈 Entradas × Saídas por Mês</span>
+        <span class="badge cyan">Saídas = Cartões + Boletos + Débito Mercado</span>
+      </div>
+      <div class="chart-container"><canvas id="chart-fluxo-mensal" aria-label="Gráfico de entradas e saídas por mês"></canvas></div>
     </div>
 
     <!-- Tabela de Resumo Mensal Comparativa (Geral) -->
@@ -988,24 +1033,29 @@
   <button class="mob-btn" data-tab="mensal">
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Mês
   </button>
-  <button class="mob-btn" data-tab="salarios">
-    <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Salários
-  </button>
-  <button class="mob-btn" data-tab="cartoes">
-    <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Cartões
-  </button>
   <button class="mob-btn" data-tab="boletos">
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Boletos
   </button>
   <button class="mob-btn" data-tab="mercado">
     <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Mercado
   </button>
-  <button class="mob-btn" data-tab="estimativa">
-    <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Estimativa
+  <button class="mob-btn" id="mob-btn-mais" type="button" aria-expanded="false" aria-controls="mob-mais-menu">
+    <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Mais
   </button>
-  <button class="mob-btn" data-tab="reservas">
-    <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Reservas
-  </button>
+  <div class="mob-mais-menu" id="mob-mais-menu">
+    <button class="mob-btn" data-tab="salarios">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Salários
+    </button>
+    <button class="mob-btn" data-tab="cartoes">
+      <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Cartões
+    </button>
+    <button class="mob-btn" data-tab="estimativa">
+      <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Estimativa
+    </button>
+    <button class="mob-btn" data-tab="reservas">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Reservas
+    </button>
+  </div>
 </nav>
 
 <!-- MODAL ADICIONAR / EDITAR ITEM ESTIMATIVA -->
@@ -1039,6 +1089,17 @@
 </div>
 
 <!-- MODAL: EDITAR VALOR DO BOLETO / ITEM -->
+<div id="modal-lixeira" class="modal-overlay" onclick="if (event.target === this) fecharLixeira()">
+  <div class="modal-box" style="max-width: 620px;">
+    <div class="modal-header">
+      <h2>🗑️ Lixeira</h2>
+      <button type="button" class="btn-close" onclick="fecharLixeira()" aria-label="Fechar">&times;</button>
+    </div>
+    <p style="font-size:.82rem;color:var(--text-muted)">Registros excluídos ficam guardados aqui e podem ser restaurados a qualquer momento.</p>
+    <div id="lixeira-body"></div>
+  </div>
+</div>
+
 <div id="modal-editar-boleto" class="modal-overlay">
   <div class="modal-box" style="max-width: 460px;">
     <div class="modal-header">
@@ -1225,8 +1286,13 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
   getFirestore, collection, onSnapshot, addDoc, setDoc,
-  deleteDoc, doc, query, orderBy, serverTimestamp, getDoc, getDocs
+  doc, query, orderBy, serverTimestamp, getDoc, getDocs,
+  writeBatch, updateDoc, deleteField
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+  getRedirectResult, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 // Chart.js via CDN
 const chartScript = document.createElement('script');
@@ -1237,6 +1303,11 @@ document.head.appendChild(chartScript);
 const qrScript = document.createElement('script');
 qrScript.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
 document.head.appendChild(qrScript);
+
+// APP INSTALÁVEL (PWA)
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service worker não registrado:', err));
+}
 
 // FIREBASE INIT
 const firebaseConfig = {
@@ -1250,6 +1321,7 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // COLLECTIONS
 const COLL_MERCADO = 'compras';
@@ -1279,6 +1351,10 @@ let escaneando = false;
 let itensNotaCarregada = [];
 
 // UTILITÁRIOS
+// Escapa texto vindo de fora (SEFAZ, PDFs, digitação) antes de ir para innerHTML
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"'`]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[ch]));
+}
 function brl(v) {
   return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -1303,15 +1379,27 @@ function setStatus(msg, color='var(--accent-amber)') {
   const el = document.getElementById('status-msg');
   if (el) { el.textContent = msg; el.style.color = color; }
 }
+// Datas no fuso local (toISOString usa UTC e vira o mês às 21h no Brasil)
+function pad2(n) { return String(n).padStart(2, '0'); }
+function mesAtualLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+function dataHojeLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function dataHoraLocalInput(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
 function toDatetimeInputString(isoOrDateStr) {
-  if (!isoOrDateStr) return new Date().toISOString().slice(0, 16);
+  if (!isoOrDateStr) return dataHoraLocalInput(new Date());
   try {
     const d = new Date(isoOrDateStr);
-    if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    if (isNaN(d.getTime())) return dataHoraLocalInput(new Date());
+    return dataHoraLocalInput(d);
   } catch {
-    return new Date().toISOString().slice(0, 16);
+    return dataHoraLocalInput(new Date());
   }
 }
 
@@ -1336,7 +1424,30 @@ window.goTab = function(id) {
   if (sec) sec.classList.add('active');
 
   document.querySelectorAll(`[data-tab="${id}"]`).forEach(b => b.classList.add('active'));
+
+  const maisMenu = document.getElementById('mob-mais-menu');
+  const maisBtn = document.getElementById('mob-btn-mais');
+  if (maisMenu && maisBtn) {
+    maisMenu.classList.remove('open');
+    maisBtn.setAttribute('aria-expanded', 'false');
+    maisBtn.classList.toggle('active', !!maisMenu.querySelector(`[data-tab="${id}"]`));
+  }
+  window.scrollTo({ top: 0 });
 };
+
+document.getElementById('mob-btn-mais')?.addEventListener('click', e => {
+  e.stopPropagation();
+  const menu = document.getElementById('mob-mais-menu');
+  const aberto = menu.classList.toggle('open');
+  e.currentTarget.setAttribute('aria-expanded', String(aberto));
+});
+document.addEventListener('click', e => {
+  const menu = document.getElementById('mob-mais-menu');
+  if (menu?.classList.contains('open') && !menu.contains(e.target)) {
+    menu.classList.remove('open');
+    document.getElementById('mob-btn-mais')?.setAttribute('aria-expanded', 'false');
+  }
+});
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => goTab(btn.getAttribute('data-tab')));
@@ -1435,32 +1546,216 @@ window.exportarBackupJSON = async function() {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// LOGIN COM GOOGLE
+// Quem pode ver/editar os dados é definido nas regras do Firestore
+// (arquivo firestore.rules). A tela de login só organiza o acesso.
+// ═══════════════════════════════════════════════════════════════════════════
+const provedorGoogle = new GoogleAuthProvider();
+provedorGoogle.setCustomParameters({ prompt: 'select_account' });
+
+function mostrarTelaLogin(estado, detalhe = '') {
+  const tela = document.getElementById('tela-login');
+  const msg = document.getElementById('login-msg');
+  const btn = document.getElementById('btn-login-google');
+  const btnSair = document.getElementById('btn-login-trocar');
+  if (!tela) return;
+  tela.style.display = 'flex';
+  btn.style.display = estado === 'carregando' ? 'none' : 'inline-flex';
+  btnSair.style.display = estado === 'acesso-negado' ? 'inline-flex' : 'none';
+
+  const textos = {
+    'carregando': '⏳ Verificando acesso...',
+    'deslogado': 'Entre com a conta Google autorizada para acessar os dados.',
+    'acesso-negado': `🚫 A conta <strong>${esc(auth.currentUser?.email || '')}</strong> não tem permissão para acessar estes dados. Entre com outra conta.`,
+    'erro': `❌ Não foi possível entrar: ${esc(detalhe)}`
+  };
+  msg.innerHTML = textos[estado] || '';
+  if (estado === 'acesso-negado') btn.style.display = 'none';
+}
+
+function esconderTelaLogin() {
+  const tela = document.getElementById('tela-login');
+  if (tela) tela.style.display = 'none';
+}
+
+function atualizarUsuarioHeader(user) {
+  const el = document.getElementById('usuario-logado');
+  if (!el) return;
+  if (!user) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  const nome = (user.displayName || user.email || '').split(' ')[0];
+  document.getElementById('usuario-nome').textContent = nome;
+  document.getElementById('usuario-logado').title = `Conectado como ${user.email}`;
+}
+
+window.entrarComGoogle = async function() {
+  try {
+    await signInWithPopup(auth, provedorGoogle);
+  } catch (err) {
+    // Celulares/app instalado podem bloquear popup: usa redirecionamento
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(err.code)) {
+      await signInWithRedirect(auth, provedorGoogle);
+      return;
+    }
+    if (err.code === 'auth/popup-closed-by-user') return;
+    const explicacoes = {
+      'auth/unauthorized-domain': 'este endereço não está autorizado no Firebase (Authentication → Settings → Authorized domains).',
+      'auth/operation-not-allowed': 'o login com Google não está ativado no Firebase (Authentication → Sign-in method).',
+      'auth/configuration-not-found': 'o Firebase Authentication ainda não foi configurado no projeto.'
+    };
+    mostrarTelaLogin('erro', explicacoes[err.code] || err.message);
+  }
+};
+
+window.sairDaConta = async function() {
+  if (!confirm('Deseja sair da sua conta?')) return;
+  await signOut(auth);
+  location.reload();
+};
+
+window.trocarDeConta = async function() {
+  await signOut(auth);
+  location.reload();
+};
+
+getRedirectResult(auth).catch(err => mostrarTelaLogin('erro', err.message));
+
+onAuthStateChanged(auth, user => {
+  atualizarUsuarioHeader(user);
+  if (user) {
+    esconderTelaLogin();
+    iniciarListeners();
+  } else {
+    mostrarTelaLogin('deslogado');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIXEIRA — EXCLUSÃO REVERSÍVEL
+// Nada é apagado de verdade: o documento recebe o campo "excluidoEm" e some
+// das telas. Pela Lixeira é possível restaurar (remove o campo).
+// ═══════════════════════════════════════════════════════════════════════════
+const lixeira = {};
+
+function separarLixeira(snap) {
+  const ativos = [];
+  const excluidos = [];
+  snap.docs.forEach(d => {
+    const item = { id: d.id, ...d.data() };
+    (item.excluidoEm ? excluidos : ativos).push(item);
+  });
+  return [ativos, excluidos];
+}
+
+async function moverParaLixeira(colecao, id) {
+  await updateDoc(doc(db, colecao, id), { excluidoEm: new Date().toISOString() });
+}
+
+const NOMES_COLECOES_LIXEIRA = {
+  [COLL_ENTRADAS]: '💵 Entradas / Salários',
+  [COLL_FATURAS]: '💳 Faturas de Cartão',
+  [COLL_BOLETOS]: '📄 Boletos & Contas',
+  [COLL_MERCADO]: '🛒 Notas de Mercado',
+  [COLL_ESTIMATIVAS]: '🔮 Estimativas'
+};
+
+function totalItensLixeira() {
+  return Object.values(lixeira).reduce((acc, arr) => acc + (arr ? arr.length : 0), 0);
+}
+
+window.abrirLixeira = function() {
+  document.getElementById('modal-lixeira')?.classList.add('active');
+  renderLixeira();
+};
+window.fecharLixeira = function() {
+  document.getElementById('modal-lixeira')?.classList.remove('active');
+};
+
+function renderLixeira() {
+  const btn = document.getElementById('btn-abrir-lixeira');
+  const total = totalItensLixeira();
+  if (btn) btn.innerHTML = `🗑️ Lixeira${total ? ` (${total})` : ''}`;
+
+  const body = document.getElementById('lixeira-body');
+  if (!body || !document.getElementById('modal-lixeira')?.classList.contains('active')) return;
+
+  if (!total) {
+    body.innerHTML = `<div class="empty-state">A lixeira está vazia.</div>`;
+    return;
+  }
+
+  body.innerHTML = Object.keys(NOMES_COLECOES_LIXEIRA).map(colecao => {
+    const itens = [...(lixeira[colecao] || [])].sort((a, b) => String(b.excluidoEm).localeCompare(String(a.excluidoEm)));
+    if (!itens.length) return '';
+    return `
+      <div class="section-title" style="margin-top:1rem">${NOMES_COLECOES_LIXEIRA[colecao]} (${itens.length})</div>
+      ${itens.map(x => {
+        const nome = x.descricao || x.nomeMercado || x.nome || (colecao === COLL_ESTIMATIVAS ? `Estimativa ${x.id}` : x.id);
+        const valor = x.valorAPagar ?? x.valorTotal ?? x.valor;
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.65rem 0;border-bottom:1px solid var(--border-color)">
+            <div style="min-width:0">
+              <div style="font-weight:600;overflow-wrap:anywhere">${esc(nome)}</div>
+              <div style="font-size:.75rem;color:var(--text-muted)">
+                ${x.mesAno ? `Mês ${esc(x.mesAno)} · ` : ''}${valor !== undefined ? brl(valor) + ' · ' : ''}excluído em ${esc(fmtData(x.excluidoEm))}
+              </div>
+            </div>
+            <button class="btn-secondary" style="padding:.4rem .8rem;font-size:.8rem;flex-shrink:0" onclick="restaurarDaLixeira('${colecao}', '${esc(x.id)}')">♻️ Restaurar</button>
+          </div>`;
+      }).join('')}`;
+  }).join('');
+}
+
+window.restaurarDaLixeira = async function(colecao, id) {
+  try {
+    await updateDoc(doc(db, colecao, id), { excluidoEm: deleteField() });
+    mesesExcluidosManualmente.clear();
+    toastMsg('♻️ Registro restaurado com sucesso!');
+  } catch (err) {
+    alert('Erro ao restaurar: ' + err.message);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // FIREBASE — LISTENERS EM TEMPO REAL
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Os dados só são carregados depois do login (as regras do Firestore exigem usuário autenticado)
+let listenersIniciados = false;
+function erroListener(nome) {
+  return err => {
+    console.error(`Firestore ${nome}:`, err);
+    if (err.code === 'permission-denied') mostrarTelaLogin('acesso-negado');
+  };
+}
+
+function iniciarListeners() {
+if (listenersIniciados) return;
+listenersIniciados = true;
+
 // 1. Escutar Compras do Mercado
 onSnapshot(query(collection(db, COLL_MERCADO), orderBy('dataEmissao', 'desc')), snap => {
-  todasCompras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  [todasCompras, lixeira[COLL_MERCADO]] = separarLixeira(snap);
   renderTudo();
-}, err => console.error('Firestore Mercado:', err));
+}, erroListener('Mercado'));
 
 // 2. Escutar Entradas / Salários
 onSnapshot(collection(db, COLL_ENTRADAS), snap => {
-  todasEntradas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  [todasEntradas, lixeira[COLL_ENTRADAS]] = separarLixeira(snap);
   renderTudo();
-}, err => console.error('Firestore Entradas:', err));
+}, erroListener('Entradas'));
 
 // 3. Escutar Faturas de Cartão
 onSnapshot(collection(db, COLL_FATURAS), snap => {
-  todasFaturas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  [todasFaturas, lixeira[COLL_FATURAS]] = separarLixeira(snap);
   renderTudo();
-}, err => console.error('Firestore Faturas:', err));
+}, erroListener('Faturas'));
 
 // 3.5 Escutar Boletos & Contas
 onSnapshot(collection(db, COLL_BOLETOS), snap => {
-  todosBoletos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  [todosBoletos, lixeira[COLL_BOLETOS]] = separarLixeira(snap);
   renderTudo();
-}, err => console.error('Firestore Boletos:', err));
+}, erroListener('Boletos'));
 
 // 4. Escutar Configurações de Reservas
 onSnapshot(doc(db, COLL_RESERVAS, 'config'), snap => {
@@ -1468,22 +1763,23 @@ onSnapshot(doc(db, COLL_RESERVAS, 'config'), snap => {
     dadosReservas = snap.data();
   }
   renderTudo();
-}, err => console.error('Firestore Reservas:', err));
+}, erroListener('Reservas'));
 
 // 4.5 Escutar Estimativa de Custos
 onSnapshot(collection(db, COLL_ESTIMATIVAS), snap => {
-  todasEstimativas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  [todasEstimativas, lixeira[COLL_ESTIMATIVAS]] = separarLixeira(snap);
   estimativasCarregadas = true;
   renderTudo();
-}, err => console.error('Firestore Estimativas:', err));
+}, erroListener('Estimativas'));
+}
 
 // ESTADO DE NAVEGAÇÃO MENSAL
-let mesSelecionado = new Date().toISOString().slice(0, 7);
+let mesSelecionado = mesAtualLocal();
 const mesesExcluidosManualmente = new Set();
 
 function getMesesDisponiveis() {
   const set = new Set();
-  const hoje = new Date().toISOString().slice(0, 7);
+  const hoje = mesAtualLocal();
   set.add(hoje);
 
   // Considerar o próximo mês para previsão orçamentária
@@ -1545,7 +1841,7 @@ function renderSeletorMeses() {
 
   const meses = getMesesDisponiveis();
   if (!meses.includes(mesSelecionado)) {
-    mesSelecionado = meses[0] || new Date().toISOString().slice(0, 7);
+    mesSelecionado = meses[0] || mesAtualLocal();
   }
 
   const inp1 = document.getElementById('inp-seletor-mes-global');
@@ -1587,7 +1883,18 @@ window.switchMensalSub = function(secId) {
 };
 
 // RENDERIZAÇÃO GERAL UNIFICADA
+// Agrupa várias chamadas seguidas (ex: 6 coleções chegando ao abrir o site) em uma única renderização
+let renderAgendado = false;
 function renderTudo() {
+  if (renderAgendado) return;
+  renderAgendado = true;
+  setTimeout(() => {
+    renderAgendado = false;
+    renderTudoAgora();
+  }, 30);
+}
+
+function renderTudoAgora() {
   renderSeletorMeses();
   renderDashboardGeral();
   renderMensalView();
@@ -1600,6 +1907,9 @@ function renderTudo() {
   renderComparacao();
   renderRecorrencia();
   renderReservasEEconomias();
+  renderLixeira();
+  renderAlertasVencimento();
+  renderChartFluxoMensal();
 }
 
 // RENDERIZAÇÃO DO MÊS SELECIONADO NA ABA MÊS A MÊS
@@ -1670,7 +1980,7 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
               <thead><tr><th>Pessoa</th><th>Descrição</th><th>Tipo</th><th class="num">Valor</th><th>Ação</th></tr></thead>
               <tbody>${entradasMes.map(e => `<tr>
                 <td><span class="badge ${e.pessoa==='Victor'?'green':e.pessoa==='Maria'?'purple':'cyan'}">${e.pessoa}</span></td>
-                <td><strong>${e.descricao}</strong></td>
+                <td><strong>${esc(e.descricao)}</strong></td>
                 <td><span class="badge amber">${e.tipo==='holerite'?'Holerite':'Manual'}</span></td>
                 <td class="num" style="color:#34d399"><strong>${brl(e.valor)}</strong></td>
                 <td><button class="btn-danger" onclick="excluirEntrada('${e.id}')">🗑️</button></td>
@@ -1699,7 +2009,7 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
               <div class="purchase-card" style="margin-bottom:1rem">
                 <div class="purchase-header" onclick="toggleDetail('fat-m-${f.id}')">
                   <div class="purchase-info">
-                    <h3>${f.cartao === 'Nubank' ? '🟣 Nubank' : f.cartao === 'Santander' ? '🔴 Santander' : '💳 ' + (f.descricao || f.cartao)}</h3>
+                    <h3>${esc(f.cartao === 'Nubank' ? '🟣 Nubank' : f.cartao === 'Santander' ? '🔴 Santander' : '💳 ' + (f.descricao || f.cartao))}</h3>
                     <p>Vencimento: <strong>${f.dataVencimento || '—'}</strong> • ${f.qtdItens || (f.itens ? f.itens.length : 0)} lançamentos</p>
                   </div>
                   <div class="purchase-values" style="display:flex;align-items:center;gap:.75rem">
@@ -1741,14 +2051,17 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
               <div class="purchase-card" style="margin-bottom:1rem">
                 <div class="purchase-header" onclick="toggleDetail('bol-m-${b.id}')">
                   <div class="purchase-info">
-                    <h3>📄 ${getNomeBoleto(b)}</h3>
-                    <p>Vencimento: <strong>${b.dataVencimento || '—'}</strong> • ${b.qtdItens || (b.itens ? b.itens.length : 0)} encargos</p>
+                    <h3>📄 ${esc(getNomeBoleto(b))} ${statusBoleto(b).badge}</h3>
+                    <p>Vencimento: <strong>${b.dataVencimento ? fmtDataVencimento(b.dataVencimento) : '—'}</strong> •${b.qtdItens || (b.itens ? b.itens.length : 0)} encargos</p>
                   </div>
                   <div class="purchase-values" style="display:flex;align-items:center;gap:.5rem">
                     <div style="text-align:right">
                       <div class="pv-total" style="color:#c084fc">${brl(b.valorTotal)}</div>
                       <div class="pv-sub">Clique para ver detalhes <span class="chevron" id="chev-bol-m-${b.id}">▼</span></div>
                     </div>
+                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;${b.pago ? '' : 'background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)'}" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="${b.pago ? 'Voltar para em aberto' : 'Marcar este boleto como pago'}">
+                      ${b.pago ? '↩️ Em aberto' : '✅ Pago'}
+                    </button>
                     <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarBoletoProximoMes('${b.id}')" title="Replicar este boleto para o próximo mês">
                       🔁 Replicar
                     </button>
@@ -1811,7 +2124,7 @@ function renderSubConteudoMensal(entradasMes, faturasMes, boletosMes, comprasMes
               <div class="purchase-card" style="margin-bottom:1rem">
                 <div class="purchase-header" onclick="toggleDetail('mer-m-${c.id}')">
                   <div class="purchase-info">
-                    <h3>🛒 ${c.nomeMercado || 'Mercado'}</h3>
+                    <h3>🛒 ${esc(c.nomeMercado || 'Mercado')}</h3>
                     <p>Data: <strong>${fmtData(c.dataEmissao)}</strong> • ${c.qtdTotalItens || 0} itens</p>
                   </div>
                   <div class="purchase-values">
@@ -1993,40 +2306,90 @@ window.excluirDadosDoMes = async function(targetMesAno) {
   const estFiltro = todasEstimativas.filter(e => e.id === mesAno);
 
   const msgConfirmacao = `⚠️ TEM CERTEZA QUE DESEJA EXCLUIR O MÊS ${mesFmt.toUpperCase()} (${mesAno})?\n\n` +
-    `Isso irá APAGAR PERMANENTEMENTE todos os registros vinculados a este mês:\n` +
+    `Todos os registros vinculados a este mês irão para a LIXEIRA:\n` +
     `• ${entFiltro.length} Salário(s) / Entrada(s)\n` +
     `• ${fatFiltro.length} Fatura(s) de Cartão\n` +
     `• ${bolFiltro.length} Boleto(s) & Conta(s)\n` +
     `• ${merFiltro.length} Nota(s) de Mercado\n` +
     `• Estimativa orçamentária do mês\n\n` +
-    `Esta ação é irreversível. Confirmar exclusão do mês?`;
+    `Você poderá restaurá-los depois pelo botão "Lixeira" na Visão Geral.\n\n` +
+    `Para confirmar, digite EXCLUIR:`;
 
-  if (!confirm(msgConfirmacao)) return;
+  const resposta = prompt(msgConfirmacao);
+  if (resposta === null) return;
+  if (resposta.trim().toUpperCase() !== 'EXCLUIR') {
+    toastMsg('Exclusão cancelada: confirmação não confere.');
+    return;
+  }
 
   try {
-    const batchDeletes = [];
+    // Lote atômico: ou todos vão para a lixeira, ou nenhum
+    const batch = writeBatch(db);
+    const excluidoEm = new Date().toISOString();
+    const marcar = (colecao, id) => batch.update(doc(db, colecao, id), { excluidoEm });
 
-    entFiltro.forEach(e => batchDeletes.push(deleteDoc(doc(db, COLL_ENTRADAS, e.id))));
-    fatFiltro.forEach(f => batchDeletes.push(deleteDoc(doc(db, COLL_FATURAS, f.id))));
-    bolFiltro.forEach(b => batchDeletes.push(deleteDoc(doc(db, COLL_BOLETOS, b.id))));
-    merFiltro.forEach(c => batchDeletes.push(deleteDoc(doc(db, COLL_MERCADO, c.id))));
-    estFiltro.forEach(e => batchDeletes.push(deleteDoc(doc(db, COLL_ESTIMATIVAS, e.id))));
+    entFiltro.forEach(e => marcar(COLL_ENTRADAS, e.id));
+    fatFiltro.forEach(f => marcar(COLL_FATURAS, f.id));
+    bolFiltro.forEach(b => marcar(COLL_BOLETOS, b.id));
+    merFiltro.forEach(c => marcar(COLL_MERCADO, c.id));
+    estFiltro.forEach(e => marcar(COLL_ESTIMATIVAS, e.id));
 
-    if (batchDeletes.length > 0) {
-      await Promise.all(batchDeletes);
-    }
+    await batch.commit();
 
     mesesExcluidosManualmente.add(mesAno);
 
-    toastMsg(`🗑️ O mês ${mesFmt} e todos os seus dados foram excluídos com sucesso!`);
+    toastMsg(`🗑️ O mês ${mesFmt} foi movido para a lixeira.`);
 
     const mesesRestantes = getMesesDisponiveis();
-    mesSelecionado = mesesRestantes[0] || new Date().toISOString().slice(0, 7);
+    mesSelecionado = mesesRestantes[0] || mesAtualLocal();
     renderTudo();
   } catch (err) {
     alert('Erro ao excluir dados do mês: ' + err.message);
   }
 };
+
+let chartFluxoInst = null;
+function renderChartFluxoMensal() {
+  if (typeof Chart === 'undefined') return setTimeout(renderChartFluxoMensal, 300);
+  const ctx = document.getElementById('chart-fluxo-mensal')?.getContext('2d');
+  if (!ctx) return;
+
+  const valorDoc = x => (x.valorTotal !== undefined ? x.valorTotal : (x.valor || 0));
+  const dados = getMesesDisponiveis().slice().sort().map(m => {
+    const entradas = todasEntradas.filter(x => x.mesAno === m).reduce((a, x) => a + (x.valor || 0), 0);
+    const cartoes = todasFaturas.filter(x => x.mesAno === m).reduce((a, x) => a + valorDoc(x), 0);
+    const boletos = todosBoletos.filter(x => x.mesAno === m).reduce((a, x) => a + valorDoc(x), 0);
+    const debito = todasCompras.filter(x => x.mesAno === m).reduce((a, x) => a + (x.formasPagamento?.cartaoDebito || 0), 0);
+    const saidas = cartoes + boletos + debito;
+    return { m, entradas, saidas, saldo: entradas - saidas };
+  }).filter(d => d.entradas || d.saidas);
+
+  const labels = dados.map(d => { const [a, ms] = d.m.split('-'); return `${ms}/${a}`; });
+
+  if (chartFluxoInst) chartFluxoInst.destroy();
+  chartFluxoInst = new Chart(ctx, {
+    data: {
+      labels: labels.length ? labels : ['Sem dados'],
+      datasets: [
+        { type: 'bar', label: 'Entradas', data: dados.map(d => d.entradas), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 6, order: 2 },
+        { type: 'bar', label: 'Saídas', data: dados.map(d => d.saidas), backgroundColor: 'rgba(244,63,94,0.7)', borderRadius: 6, order: 2 },
+        { type: 'line', label: 'Saldo', data: dados.map(d => d.saldo), borderColor: '#60a5fa', backgroundColor: '#60a5fa', tension: 0.3, pointRadius: 4, order: 1 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#cbd5e1' } },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${brl(c.raw)}` } }
+      },
+      scales: {
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#94a3b8', callback: v => 'R$' + v.toLocaleString('pt-BR') } },
+        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+      }
+    }
+  });
+}
 
 function renderChart(porMes) {
   if (typeof Chart === 'undefined') return setTimeout(() => renderChart(porMes), 300);
@@ -2093,7 +2456,7 @@ window.toggleFiltroEntradasTabela = function(modo) {
 // Salvar Holerite Victor (Correlacionado por Mês/Ano Selecionado)
 document.getElementById('form-holerite-victor').addEventListener('submit', async e => {
   e.preventDefault();
-  const mesAno = mesSelecionado || document.getElementById('inp-entradas-mes-ano').value || new Date().toISOString().slice(0, 7);
+  const mesAno = mesSelecionado || document.getElementById('inp-entradas-mes-ano').value || mesAtualLocal();
   const txt = document.getElementById('inp-holerite-txt-victor').value;
   let val   = parseFloat(document.getElementById('inp-salario-val-victor').value) || 0;
   if (!val && txt) val = parseHoleriteTexto(txt);
@@ -2113,7 +2476,7 @@ document.getElementById('form-holerite-victor').addEventListener('submit', async
 // Salvar Holerite Maria (Correlacionado por Mês/Ano Selecionado)
 document.getElementById('form-holerite-maria').addEventListener('submit', async e => {
   e.preventDefault();
-  const mesAno = mesSelecionado || document.getElementById('inp-entradas-mes-ano').value || new Date().toISOString().slice(0, 7);
+  const mesAno = mesSelecionado || document.getElementById('inp-entradas-mes-ano').value || mesAtualLocal();
   const txt = document.getElementById('inp-holerite-txt-maria').value;
   let val   = parseFloat(document.getElementById('inp-salario-val-maria').value) || 0;
   if (!val && txt) val = parseHoleriteTexto(txt);
@@ -2133,7 +2496,7 @@ document.getElementById('form-holerite-maria').addEventListener('submit', async 
 // Adicionar Entrada Manual (Correlacionada por Mês/Ano Selecionado)
 document.getElementById('form-entrada-manual').addEventListener('submit', async e => {
   e.preventDefault();
-  const mesAno = mesSelecionado || document.getElementById('inp-entradas-mes-ano').value || new Date().toISOString().slice(0, 7);
+  const mesAno = mesSelecionado || document.getElementById('inp-entradas-mes-ano').value || mesAtualLocal();
   const desc   = document.getElementById('inp-ent-desc').value.trim();
   const val    = parseFloat(document.getElementById('inp-ent-val').value) || 0;
   const pessoa = document.getElementById('inp-ent-pessoa').value;
@@ -2161,7 +2524,7 @@ function calcularMediaMensalEntradas() {
 }
 
 function renderSalariosEEntradas() {
-  const mesAnoSel = mesSelecionado || document.getElementById('inp-entradas-mes-ano')?.value || new Date().toISOString().slice(0, 7);
+  const mesAnoSel = mesSelecionado || document.getElementById('inp-entradas-mes-ano')?.value || mesAtualLocal();
   
   const lblRef = document.getElementById('lbl-entradas-mes-ref');
   if (lblRef) {
@@ -2215,7 +2578,7 @@ function renderSalariosEEntradas() {
       <thead><tr><th>Mês / Ref</th><th>Descrição</th><th>Pessoa</th><th>Tipo</th><th class="num">Valor</th><th>Ação</th></tr></thead>
       <tbody>${listaExibicao.map(e => `<tr>
         <td><span class="badge green">${e.mesAno || '—'}</span></td>
-        <td><strong>${e.descricao}</strong></td>
+        <td><strong>${esc(e.descricao)}</strong></td>
         <td><span class="badge ${e.pessoa==='Victor'?'green':e.pessoa==='Maria'?'purple':'cyan'}">${e.pessoa}</span></td>
         <td><span class="badge amber">${e.tipo==='holerite'?'Holerite':'Manual'}</span></td>
         <td class="num" style="color:#34d399"><strong>${brl(e.valor)}</strong></td>
@@ -2227,8 +2590,8 @@ function renderSalariosEEntradas() {
 
 window.excluirEntrada = async function(id) {
   if (!confirm('Excluir esta entrada?')) return;
-  await deleteDoc(doc(db, COLL_ENTRADAS, id));
-  toastMsg('🗑️ Entrada removida.');
+  await moverParaLixeira(COLL_ENTRADAS, id);
+  toastMsg('🗑️ Entrada movida para a lixeira.');
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2402,7 +2765,7 @@ async function processarEExibirRevisaoFatura(texto, cartaoNome) {
   const totalAPagarOficial = extrairTotalAPagarDoTexto(texto);
   const itens = parseLinhasFatura(texto);
 
-  const inpVenc = document.getElementById('inp-fatura-vencimento').value || new Date().toISOString().slice(0, 10);
+  const inpVenc = document.getElementById('inp-fatura-vencimento').value || dataHojeLocal();
   const mesAno = inpVenc.slice(0, 7);
 
   const somaItens = itens.reduce((acc, item) => acc + item.valor, 0);
@@ -2464,7 +2827,7 @@ function renderizarRevisaoFaturaUI() {
   } else {
     listaEl.innerHTML = itens.map((i, index) => `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:.4rem 0; border-bottom:1px dashed var(--border-color); font-size:.82rem;">
-        <span><strong>${i.dataCompra || '—'}</strong> — ${i.descricao}</span>
+        <span><strong>${i.dataCompra || '—'}</strong> — ${esc(i.descricao)}</span>
         <div style="display:flex; align-items:center; gap:.75rem;">
           <span style="color:#fb7185; font-weight:700;">${brl(i.valor)}</span>
           <button type="button" class="btn-danger" style="padding:.15rem .45rem; font-size:.75rem;" onclick="removerItemRevisaoFatura(${index})">🗑️</button>
@@ -2497,7 +2860,7 @@ window.confirmarEGravarFaturaDocumento = async function() {
 
   const descInp = document.getElementById('inp-revisao-fatura-desc')?.value.trim();
   const valInp = parseFloat(document.getElementById('inp-revisao-fatura-val')?.value) || 0;
-  const inpVenc = document.getElementById('inp-fatura-vencimento').value || new Date().toISOString().slice(0, 10);
+  const inpVenc = document.getElementById('inp-fatura-vencimento').value || dataHojeLocal();
 
   if (!valInp) {
     toastMsg('⚠️ Digite ou confirme o valor total da fatura.');
@@ -2669,12 +3032,12 @@ function renderHtmlAnaliseLocaisFrequentes(faturas, prefixoId = 'geral') {
           const chave = `${prefixoId}_${loc.nome}`;
           return `
             <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(251,113,133,0.35); border-radius:10px; padding:.85rem 1rem; display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:all .2s; box-shadow:0 2px 8px rgba(0,0,0,0.3)"
-                 onclick="abrirModalComprasEstabelecimento('${chave}')"
+                 onclick="abrirModalComprasEstabelecimento(${esc(JSON.stringify(chave))})"
                  onmouseover="this.style.transform='translateY(-3px)'; this.style.borderColor='#fb7185'; this.style.background='rgba(30,41,59,0.95)'" 
                  onmouseout="this.style.transform='none'; this.style.borderColor='rgba(251,113,133,0.35)'; this.style.background='rgba(15,23,42,0.85)'"
-                 title="Clique para ver as ${loc.qtd} compras de ${loc.nome}">
+                 title="Clique para ver as ${loc.qtd} compras de ${esc(loc.nome)}">
               <div>
-                <div style="font-weight:700; font-size:.88rem; color:#f8fafc; margin-bottom:.3rem; word-break:break-word">🏪 ${loc.nome}</div>
+                <div style="font-weight:700; font-size:.88rem; color:#f8fafc; margin-bottom:.3rem; word-break:break-word">🏪 ${esc(loc.nome)}</div>
                 <span class="badge rose" style="font-size:.72rem">🛒 ${loc.qtd} compras 🔍</span>
               </div>
               <div style="text-align:right; min-width:95px">
@@ -2721,7 +3084,7 @@ window.abrirModalComprasEstabelecimento = function(chave) {
     });
   }
 
-  document.getElementById('modal-est-titulo').innerHTML = `🏬 Estabelecimento: <span style="color:#fff">${itemAnalise.nome}</span>`;
+  document.getElementById('modal-est-titulo').innerHTML = `🏬 Estabelecimento: <span style="color:#fff">${esc(itemAnalise.nome)}</span>`;
   document.getElementById('modal-est-subtitulo').textContent = `${itemAnalise.qtd} compra(s) somando o valor total de ${brl(itemAnalise.valorTotal)}`;
 
   const bodyEl = document.getElementById('modal-est-body');
@@ -2751,8 +3114,8 @@ window.abrirModalComprasEstabelecimento = function(chave) {
           ${itemAnalise.compras.map(c => `
             <tr>
               <td><strong>${c.dataCompra || '—'}</strong></td>
-              <td>${c.descricao}</td>
-              <td><span class="badge ${c.cartao.toLowerCase().includes('nubank') ? 'purple' : 'red'}">${c.cartao}</span></td>
+              <td>${esc(c.descricao)}</td>
+              <td><span class="badge ${c.cartao.toLowerCase().includes('nubank') ? 'purple' : 'red'}">${esc(c.cartao)}</span></td>
               <td class="num" style="color:#fb7185; font-weight:700">${brl(c.valor)}</td>
             </tr>
           `).join('')}
@@ -3010,7 +3373,7 @@ function renderHtmlAnaliseGastosCartao(faturas) {
                   <div style="display:flex; align-items:center; gap:.5rem">
                     <span style="font-size:1rem; font-weight:700">${medalha}</span>
                     <div>
-                      <strong style="font-size:.85rem; color:#f8fafc">${loc.nome}</strong>
+                      <strong style="font-size:.85rem; color:#f8fafc">${esc(loc.nome)}</strong>
                       <span style="font-size:.72rem; color:var(--text-muted); display:block">${loc.qtd} compra${loc.qtd > 1 ? 's' : ''} • ${pct}% do cartão</span>
                     </div>
                   </div>
@@ -3108,7 +3471,7 @@ function renderCartoesCredito() {
             const badgeClass = isNubank ? 'purple' : 'red';
             const badgeIcon = isNubank ? '🟣' : '🔴';
 
-            const dataVencStr = f.dataVencimento ? fmtData(f.dataVencimento).split(',')[0] : '—';
+            const dataVencStr = f.dataVencimento ? fmtDataVencimento(f.dataVencimento) : '—';
             const mesAnoStr = f.mesAno || '—';
 
             return `
@@ -3167,9 +3530,9 @@ function renderItensFatura(f) {
               const chave = `${prefixoCard}_${loc.nome}`;
               return `
                 <span style="background:rgba(15,23,42,0.9); border:1px solid rgba(251,113,133,0.4); border-radius:6px; padding:.3rem .6rem; font-size:.78rem; color:#f1f5f9; display:inline-flex; align-items:center; gap:.35rem; cursor:pointer"
-                      onclick="event.stopPropagation(); abrirModalComprasEstabelecimento('${chave}')"
-                      title="Clique para ver detalhadamente as compras de ${loc.nome}">
-                  🏬 <strong>${loc.nome}</strong>: <span class="badge rose" style="font-size:.7rem">${loc.qtd}x compras</span> <strong style="color:#fb7185; margin-left:.25rem">${brl(loc.valorTotal)}</strong>
+                      onclick="event.stopPropagation(); abrirModalComprasEstabelecimento(${esc(JSON.stringify(chave))})"
+                      title="Clique para ver detalhadamente as compras de ${esc(loc.nome)}">
+                  🏬 <strong>${esc(loc.nome)}</strong>: <span class="badge rose" style="font-size:.7rem">${loc.qtd}x compras</span> <strong style="color:#fb7185; margin-left:.25rem">${brl(loc.valorTotal)}</strong>
                 </span>
               `;
             }).join('')}
@@ -3184,7 +3547,7 @@ function renderItensFatura(f) {
         <thead><tr><th>Data Compra</th><th>Descrição do Lançamento</th><th class="num">Valor</th><th>Ação</th></tr></thead>
         <tbody>${f.itens.map((i, idx) => `<tr>
           <td><strong>${i.dataCompra || '—'}</strong></td>
-          <td>${i.descricao}</td>
+          <td>${esc(i.descricao)}</td>
           <td class="num" style="color:#fb7185"><strong>${brl(i.valor)}</strong></td>
           <td><button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="removerItemFaturaCadastrada('${f.id}', ${idx})">🗑️ Excluir</button></td>
         </tr>`).join('')}</tbody>
@@ -3194,7 +3557,7 @@ function renderItensFatura(f) {
   return `<div class="table-responsive"><table class="custom-table">
     <thead><tr><th>Descrição</th><th class="num">Valor</th><th>Ação</th></tr></thead>
     <tbody><tr>
-      <td>${f.descricao || 'Fatura do Cartão'}</td>
+      <td>${esc(f.descricao || 'Fatura do Cartão')}</td>
       <td class="num" style="color:#fb7185"><strong>${brl(f.valor || f.valorTotal)}</strong></td>
       <td><button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="excluirFaturaDocumento('${f.id}')">🗑️ Excluir</button></td>
     </tr></tbody>
@@ -3212,8 +3575,8 @@ window.removerItemFaturaCadastrada = async function(faturaId, itemIndex) {
   const novoTotal = novosItens.reduce((acc, i) => acc + (i.valor || 0), 0);
 
   if (novosItens.length === 0) {
-    await deleteDoc(doc(db, COLL_FATURAS, faturaId));
-    toastMsg('🗑️ Fatura excluída pois todos os itens foram removidos.');
+    await moverParaLixeira(COLL_FATURAS, faturaId);
+    toastMsg('🗑️ Fatura movida para a lixeira pois todos os itens foram removidos.');
   } else {
     await setDoc(doc(db, COLL_FATURAS, faturaId), {
       ...fatura,
@@ -3227,8 +3590,8 @@ window.removerItemFaturaCadastrada = async function(faturaId, itemIndex) {
 
 window.excluirFaturaDocumento = async function(id) {
   if (!confirm('Excluir esta fatura e todos os seus lançamentos?')) return;
-  await deleteDoc(doc(db, COLL_FATURAS, id));
-  toastMsg('🗑️ Fatura removida com sucesso.');
+  await moverParaLixeira(COLL_FATURAS, id);
+  toastMsg('🗑️ Fatura movida para a lixeira.');
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3303,7 +3666,7 @@ async function processarEExibirRevisaoBoleto(texto, nomeOrigem) {
     atualizarMesRefBoleto();
   }
 
-  const inpVenc = document.getElementById('inp-boleto-vencimento').value || new Date().toISOString().slice(0, 10);
+  const inpVenc = document.getElementById('inp-boleto-vencimento').value || dataHojeLocal();
   const mesAno = inpVenc.slice(0, 7);
 
   const descDefinitiva = parsed.beneficiario || nomeOrigem.replace(/\.[^/.]+$/, '') || 'Boleto / Conta';
@@ -3345,7 +3708,7 @@ function renderizarRevisaoBoletoUI() {
   } else {
     listaEl.innerHTML = itens.map((i, index) => `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:.4rem 0; border-bottom:1px dashed var(--border-color); font-size:.82rem;">
-        <span><strong>${i.dataBoleto || '—'}</strong> — ${i.descricao}</span>
+        <span><strong>${i.dataBoleto || '—'}</strong> — ${esc(i.descricao)}</span>
         <div style="display:flex; align-items:center; gap:.75rem;">
           <span style="color:#c084fc; font-weight:700;">${brl(i.valor)}</span>
           <button type="button" class="btn-danger" style="padding:.15rem .45rem; font-size:.75rem;" onclick="removerItemRevisaoBoleto(${index})">🗑️</button>
@@ -3377,7 +3740,7 @@ window.confirmarEGravarBoletoDocumento = async function() {
 
   const descInp = document.getElementById('inp-revisao-boleto-desc').value.trim();
   const valInp = parseFloat(document.getElementById('inp-revisao-boleto-val').value) || 0;
-  const inpVenc = document.getElementById('inp-boleto-vencimento').value || new Date().toISOString().slice(0, 10);
+  const inpVenc = document.getElementById('inp-boleto-vencimento').value || dataHojeLocal();
 
   if (!valInp) {
     toastMsg('⚠️ Digite ou confirme o valor total do boleto.');
@@ -3553,7 +3916,7 @@ function renderHtmlAnaliseBoletosRecorrentes(boletos) {
             ${alertasAumentoBoleto.map(a => `
               <div style="font-size:.83rem; color:#f1f5f9; background:rgba(15,23,42,0.8); border-left:3px solid #fb7185; padding:.5rem .75rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem">
                 <div>
-                  🚨 <strong>${a.nome}</strong>: Aumentou <strong style="color:#fb7185">+${brl(a.dif)} (+${a.pct}%)</strong> em relação a ${nomeMesAnteriorFmt}.
+                  🚨 <strong>${esc(a.nome)}</strong>: Aumentou <strong style="color:#fb7185">+${brl(a.dif)} (+${a.pct}%)</strong> em relação a ${nomeMesAnteriorFmt}.
                   <span style="color:var(--text-muted); display:block; margin-top:.15rem">Mês anterior: ${brl(a.valAnterior)} ➔ Mês atual: ${brl(a.valAtual)}</span>
                 </div>
                 <span class="badge rose" style="font-size:.78rem">+${a.pct}%</span>
@@ -3609,7 +3972,7 @@ function renderHtmlAnaliseBoletosRecorrentes(boletos) {
           return `
             <div style="background:rgba(15,23,42,0.75); border:1px solid var(--border-color); border-radius:10px; padding:.85rem 1rem; display:flex; justify-content:space-between; align-items:center">
               <div>
-                <div style="font-weight:700; font-size:.9rem; color:#f8fafc; margin-bottom:.25rem">📄 ${rec.nome}</div>
+                <div style="font-weight:700; font-size:.9rem; color:#f8fafc; margin-bottom:.25rem">📄 ${esc(rec.nome)}</div>
                 <div style="font-size:.75rem; color:var(--text-muted)">
                   Média: <strong>${brl(mediaMensal)}/mês</strong> &nbsp;•&nbsp; ${rec.qtd} boleto${rec.qtd > 1 ? 's' : ''}
                 </div>
@@ -3663,6 +4026,7 @@ function renderBoletos() {
     });
 
     const totalMes = boletosDoMes.reduce((acc, b) => acc + (b.valorTotal !== undefined ? b.valorTotal : (b.valor || 0)), 0);
+    const qtdPagos = boletosDoMes.filter(b => b.pago).length;
 
     let nomeMesFmt = m;
     if (m !== 'Outros' && m.includes('-')) {
@@ -3680,13 +4044,15 @@ function renderBoletos() {
           <span class="card-title" style="font-size:1.05rem">📄 Boletos de ${nomeMesFmt}</span>
           <div style="display:flex;align-items:center;gap:.75rem">
             <span class="badge purple" style="font-size:.85rem">Total: ${brl(totalMes)} (${boletosDoMes.length} boleto${boletosDoMes.length > 1 ? 's' : ''})</span>
+            ${qtdPagos ? `<span class="badge green" style="font-size:.78rem">${qtdPagos}/${boletosDoMes.length} pago${qtdPagos > 1 ? 's' : ''}</span>` : ''}
             <span class="chevron ${isFirst ? 'open' : ''}" id="chev-bol-group-${m}">▼</span>
           </div>
         </div>
         <div id="bol-group-${m}" class="purchase-details ${isFirst ? 'open' : ''}" style="padding:.75rem 1rem;display:${isFirst ? 'block' : 'none'}">
           ${boletosDoMes.map(b => {
             const valorTotalBoleto = b.valorTotal !== undefined ? b.valorTotal : (b.valor || 0);
-            const dataVencStr = b.dataVencimento ? fmtData(b.dataVencimento).split(',')[0] : '—';
+            const dataVencStr = b.dataVencimento ? fmtDataVencimento(b.dataVencimento) : '—';
+            const st = statusBoleto(b);
             const mesAnoStr = b.mesAno || '—';
             const descBoleto = getNomeBoleto(b);
 
@@ -3694,7 +4060,7 @@ function renderBoletos() {
               <div class="purchase-card" style="margin-bottom:1rem">
                 <div class="purchase-header" onclick="toggleDetail('bol-${b.id}')">
                   <div class="purchase-info">
-                    <h3><span class="badge purple">📄 ${descBoleto}</span> — Vencimento: ${dataVencStr}</h3>
+                    <h3><span class="badge purple">📄 ${esc(descBoleto)}</span> — Vencimento: ${dataVencStr} ${st.badge}</h3>
                     <p>📅 Mês Referência: <strong>${mesAnoStr}</strong> &nbsp;•&nbsp; 🛒 ${b.qtdItens || (b.itens?.length || 1)} itens / encargos</p>
                   </div>
                   <div class="purchase-values" style="display:flex;align-items:center;gap:.5rem">
@@ -3702,6 +4068,9 @@ function renderBoletos() {
                       <div class="pv-total" style="color:#c084fc">${brl(valorTotalBoleto)}</div>
                       <div class="pv-sub">Boleto do Mês</div>
                     </div>
+                    <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;white-space:nowrap;${b.pago ? '' : 'background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)'}" onclick="event.stopPropagation(); alternarBoletoPago('${b.id}')" title="${b.pago ? 'Voltar para em aberto' : 'Marcar este boleto como pago'}">
+                      ${b.pago ? '↩️ Em aberto' : '✅ Pago'}
+                    </button>
                     <button type="button" class="btn-secondary" style="padding:.35rem .65rem;font-size:.78rem;background:rgba(56,189,248,.12);color:#38bdf8;border:1px solid rgba(56,189,248,.3);white-space:nowrap" onclick="event.stopPropagation(); replicarBoletoProximoMes('${b.id}')" title="Replicar este boleto para o próximo mês">
                       🔁 Replicar
                     </button>
@@ -3732,6 +4101,93 @@ function renderBoletos() {
       </div>
     `;
   }).join('');
+}
+
+// Lê vencimento "AAAA-MM-DD" ou "DD/MM/AAAA" no fuso local
+// (new Date("2026-08-10") é meia-noite UTC = dia 09 às 21h no Brasil)
+function parseDataVencimento(str) {
+  if (!str || typeof str !== 'string') return null;
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDataVencimento(str) {
+  const d = parseDataVencimento(str);
+  return d ? d.toLocaleDateString('pt-BR') : '—';
+}
+
+function diasAteVencimento(str) {
+  const d = parseDataVencimento(str);
+  if (!d) return null;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - hoje.getTime()) / 86400000);
+}
+
+// Status do boleto. Boletos muito antigos sem marcação não viram alerta
+// (eram cadastrados antes de existir o controle de pago/em aberto).
+function statusBoleto(b) {
+  if (b.pago) return { tipo: 'pago', badge: `<span class="badge green">✅ Pago${b.dataPagamento ? ' em ' + esc(fmtDataVencimento(b.dataPagamento)) : ''}</span>` };
+  const dias = diasAteVencimento(b.dataVencimento);
+  if (dias === null) return { tipo: 'aberto', badge: `<span class="badge cyan">Em aberto</span>` };
+  if (dias < -30) return { tipo: 'antigo', badge: '' };
+  if (dias < 0) return { tipo: 'vencido', dias, badge: `<span class="badge red">⚠️ Vencido há ${-dias} dia${dias === -1 ? '' : 's'}</span>` };
+  if (dias === 0) return { tipo: 'hoje', dias, badge: `<span class="badge amber">⏰ Vence hoje</span>` };
+  if (dias <= 7) return { tipo: 'proximo', dias, badge: `<span class="badge amber">⏰ Vence em ${dias} dia${dias === 1 ? '' : 's'}</span>` };
+  return { tipo: 'aberto', dias, badge: `<span class="badge cyan">Em aberto</span>` };
+}
+
+window.alternarBoletoPago = async function(id) {
+  const boleto = todosBoletos.find(b => b.id === id);
+  if (!boleto) return;
+  try {
+    if (boleto.pago) {
+      await updateDoc(doc(db, COLL_BOLETOS, id), { pago: false, dataPagamento: deleteField() });
+      toastMsg('↩️ Boleto marcado como em aberto.');
+    } else {
+      await updateDoc(doc(db, COLL_BOLETOS, id), { pago: true, dataPagamento: dataHojeLocal() });
+      toastMsg('✅ Boleto marcado como pago!');
+    }
+  } catch (err) {
+    alert('Erro ao atualizar status do boleto: ' + err.message);
+  }
+};
+
+// Alerta na Visão Geral: boletos em aberto vencidos (até 30 dias) ou vencendo em até 7 dias
+function renderAlertasVencimento() {
+  const el = document.getElementById('alertas-vencimento');
+  if (!el) return;
+
+  const alertas = todosBoletos
+    .map(b => ({ b, st: statusBoleto(b) }))
+    .filter(x => ['vencido', 'hoje', 'proximo'].includes(x.st.tipo))
+    .sort((a, b) => a.st.dias - b.st.dias);
+
+  if (!alertas.length) { el.innerHTML = ''; return; }
+
+  const temVencido = alertas.some(x => x.st.tipo === 'vencido');
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1.5rem;border-color:${temVencido ? '#fb7185' : '#fbbf24'}">
+      <div class="card-header">
+        <span class="card-title" style="color:${temVencido ? '#fb7185' : '#fbbf24'}">🔔 Boletos para pagar (${alertas.length})</span>
+        <button class="btn-secondary" style="padding:.35rem .75rem;font-size:.8rem" onclick="goTab('boletos')">Ver boletos</button>
+      </div>
+      ${alertas.map(({ b, st }) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.55rem 0;border-top:1px solid var(--border-color);flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="font-weight:600">${esc(getNomeBoleto(b))}</div>
+            <div style="font-size:.78rem;color:var(--text-muted)">Vencimento ${esc(fmtDataVencimento(b.dataVencimento))} · ${brl(b.valorTotal !== undefined ? b.valorTotal : (b.valor || 0))}</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            ${st.badge}
+            <button class="btn-secondary" style="padding:.3rem .65rem;font-size:.78rem" onclick="alternarBoletoPago('${b.id}')">✅ Marcar pago</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
 }
 
 function getNomeBoleto(b) {
@@ -3788,7 +4244,7 @@ function renderItensBoleto(b) {
       <thead><tr><th>Data</th><th>Descrição / Item</th><th class="num">Valor</th><th>Ação</th></tr></thead>
       <tbody>${b.itens.map((i, idx) => `<tr>
         <td><strong>${i.dataBoleto || '—'}</strong></td>
-        <td>${i.descricao}</td>
+        <td>${esc(i.descricao)}</td>
         <td class="num" style="color:#c084fc"><strong>${brl(i.valor)}</strong></td>
         <td>
           <div style="display:flex;gap:.35rem;align-items:center">
@@ -3802,7 +4258,7 @@ function renderItensBoleto(b) {
   return `<div class="table-responsive"><table class="custom-table">
     <thead><tr><th>Descrição</th><th class="num">Valor</th><th>Ação</th></tr></thead>
     <tbody><tr>
-      <td>${b.descricao || 'Boleto'}</td>
+      <td>${esc(b.descricao || 'Boleto')}</td>
       <td class="num" style="color:#c084fc"><strong>${brl(b.valor || b.valorTotal)}</strong></td>
       <td>
         <div style="display:flex;gap:.35rem;align-items:center">
@@ -3936,8 +4392,8 @@ window.removerItemBoletoCadastrado = async function(boletoId, itemIndex) {
   const novoTotal = novosItens.reduce((acc, i) => acc + (i.valor || 0), 0);
 
   if (novosItens.length === 0) {
-    await deleteDoc(doc(db, COLL_BOLETOS, boletoId));
-    toastMsg('🗑️ Boleto excluído pois todos os itens foram removidos.');
+    await moverParaLixeira(COLL_BOLETOS, boletoId);
+    toastMsg('🗑️ Boleto movido para a lixeira pois todos os itens foram removidos.');
   } else {
     await setDoc(doc(db, COLL_BOLETOS, boletoId), {
       ...boleto,
@@ -4053,10 +4509,10 @@ window.excluirBoletoDocumento = async function(id) {
   const desc = boleto ? (boleto.descricao || 'Boleto / Conta') : 'este boleto';
   const val = boleto ? brl(boleto.valorTotal !== undefined ? boleto.valorTotal : (boleto.valor || 0)) : '';
 
-  if (!confirm(`⚠️ Deseja realmente excluir ${desc} ${val ? '(' + val + ')' : ''}?\n\nEste boleto será removido permanentemente de todos os meses, resumos e relatórios do sistema.`)) return;
+  if (!confirm(`⚠️ Deseja realmente excluir ${desc} ${val ? '(' + val + ')' : ''}?\n\nO boleto irá para a Lixeira e poderá ser restaurado depois.`)) return;
 
-  await deleteDoc(doc(db, COLL_BOLETOS, id));
-  toastMsg('🗑️ Boleto removido de todo o sistema com sucesso.');
+  await moverParaLixeira(COLL_BOLETOS, id);
+  toastMsg('🗑️ Boleto movido para a lixeira.');
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4150,7 +4606,7 @@ function renderReservasEEconomias() {
   const subRec = document.getElementById('subtext-recomendacao');
   if (subRec) {
     if (totalProjetadoFimDoAno >= metaAnual) {
-      subRec.innerHTML = `✅ Projeção de <strong style="color:#34d399">${brl(totalProjetadoFimDoAno)}</strong> até Dez/2026 supera sua Meta Anual de ${brl(metaAnual)}!`;
+      subRec.innerHTML = `✅ Projeção de <strong style="color:#34d399">${brl(totalProjetadoFimDoAno)}</strong> até Dez/${new Date().getFullYear()} supera sua Meta Anual de ${brl(metaAnual)}!`;
     } else {
       const difMeta = metaAnual - totalProjetadoFimDoAno;
       subRec.innerHTML = `⚠️ Sobra média de ${brl(sobraMensalEstimada)}/mês. Projeção de ${brl(totalProjetadoFimDoAno)} fica <strong style="color:#fb7185">${brl(difMeta)}</strong> abaixo da Meta de ${brl(metaAnual)}.`;
@@ -4617,7 +5073,7 @@ function renderEstimativaCustos() {
             return `
               <tr>
                 <td>
-                  <strong style="color:#f8fafc">${i.nome}</strong>
+                  <strong style="color:#f8fafc">${esc(i.nome)}</strong>
                 </td>
                 <td class="num">
                   <input type="number" min="1" step="1" class="form-control" style="width:70px;padding:.2rem .4rem;font-size:.82rem;text-align:center" value="${i.quantidade}" onchange="atualizarQtdItemEstimativa('${i.id}', this.value)">
@@ -4840,8 +5296,8 @@ function renderListaMensal() {
 
               return `
                 <tr>
-                  <td><strong>${item.nome}</strong></td>
-                  <td><span class="badge amber">${item.marca}</span></td>
+                  <td><strong>${esc(item.nome)}</strong></td>
+                  <td><span class="badge amber">${esc(item.marca)}</span></td>
                   <td><span class="badge cyan">${freqStr}</span></td>
                   <td class="num">${qtdFmt} un/mês</td>
                   <td class="num"><span class="badge green" style="font-size:0.82rem;">${totalEstFmt}</span></td>
@@ -4944,8 +5400,8 @@ window.exportarPDFListaMensal = function() {
           ${lista.map(item => `
             <tr>
               <td class="check-col"><div class="chk-box"></div></td>
-              <td><strong>${item.nome}</strong></td>
-              <td>${item.marca}</td>
+              <td><strong>${esc(item.nome)}</strong></td>
+              <td>${esc(item.marca)}</td>
               <td class="num"><strong>${item.totalEstimadoUnidades.toFixed(1)} un</strong></td>
               <td class="num">${brl(item.valorUnitario)}</td>
               <td class="num"><strong>${brl(item.subtotalFinal)}</strong></td>
@@ -5172,7 +5628,7 @@ function preencherFormularioRevisao(dados) {
     countEl.textContent = itensNotaCarregada.length;
     listaEl.innerHTML = itensNotaCarregada.map(item => `
       <div style="display:flex; justify-content:space-between; padding: 0.35rem 0; border-bottom: 1px dashed var(--border-color);">
-        <span><strong>${item.nome}</strong> (${item.quantidade} ${item.unidade || 'Un'})</span>
+        <span><strong>${esc(item.nome)}</strong> (${item.quantidade} ${item.unidade || 'Un'})</span>
         <span>${brl(item.valorUnitario)}/un = <strong>${brl(item.valorTotal)}</strong></span>
       </div>
     `).join('');
@@ -5448,7 +5904,7 @@ function renderHistorico() {
     <div class="purchase-card">
       <div class="purchase-header" onclick="toggleDetail('${c.id}')">
         <div class="purchase-info" style="flex:1;min-width:0;">
-          <h3>${c.nomeMercado || 'Mercado'}</h3>
+          <h3>${esc(c.nomeMercado || 'Mercado')}</h3>
           <p>📅 ${fmtData(c.dataEmissao)} &nbsp;•&nbsp; 🛒 ${c.qtdTotalItens || 0} itens</p>
         </div>
         <div style="display:flex;align-items:center;gap:1.25rem;flex-shrink:0;margin-left:auto;">
@@ -5474,8 +5930,8 @@ function renderItensCompra(c) {
   return `<div class="table-responsive"><table class="custom-table">
     <thead><tr><th>Item</th><th>Marca</th><th class="num">Qtd</th><th class="num">Vl. Unit.</th><th class="num">Vl. Total</th></tr></thead>
     <tbody>${c.itens.map(i => `<tr>
-      <td>${i.nome}</td>
-      <td><span class="badge amber">${i.marca||'—'}</span></td>
+      <td>${esc(i.nome)}</td>
+      <td><span class="badge amber">${esc(i.marca||'—')}</span></td>
       <td class="num">${i.quantidade} ${i.unidade||'Un'}</td>
       <td class="num">${brl(i.valorUnitario)}</td>
       <td class="num"><strong>${brl(i.valorTotal)}</strong></td>
@@ -5508,8 +5964,8 @@ window.toggleGroupMonth = function(id) {
 window.confirmarExcluirMercado = async function(id) {
   if (!confirm('Excluir esta compra de mercado?')) return;
   try {
-    await deleteDoc(doc(db, COLL_MERCADO, id));
-    toastMsg('🗑️ Compra excluída.');
+    await moverParaLixeira(COLL_MERCADO, id);
+    toastMsg('🗑️ Compra movida para a lixeira.');
   } catch(e) { alert('Erro: ' + e.message); }
 };
 
@@ -5632,8 +6088,8 @@ function renderComparacao() {
     <thead><tr><th>Produto</th><th>Marca</th><th>Histórico (Unitário)</th><th>Variação</th></tr></thead>
     <tbody>${prodsFiltrados.map(p => `
       <tr>
-        <td><strong>${p.nome}</strong></td>
-        <td><span class="badge amber">${p.marca || '—'}</span></td>
+        <td><strong>${esc(p.nome)}</strong></td>
+        <td><span class="badge amber">${esc(p.marca || '—')}</span></td>
         <td>${p.histStr}</td>
         <td>${p.badge}</td>
       </tr>
@@ -5673,8 +6129,8 @@ function renderRecorrencia() {
         <tbody>${recArr.map(x => {
           const med = x.units.reduce((a,b)=>a+b,0)/x.units.length;
           return `<tr>
-            <td><strong>${x.nome}</strong></td>
-            <td><span class="badge amber">${x.marca||'—'}</span></td>
+            <td><strong>${esc(x.nome)}</strong></td>
+            <td><span class="badge amber">${esc(x.marca||'—')}</span></td>
             <td><span class="badge green">${x.notas}x</span></td>
             <td class="num">${x.qtd}</td>
             <td class="num">${brl(med)}</td>
@@ -5696,7 +6152,7 @@ function renderRecorrencia() {
       </div>
       <div class="brands-row">
         ${chips.map(ch => `<div class="brand-chip${ch.marca===menorMarca?' best':''}">
-          <div class="bc-name">${ch.marca} ${ch.marca===menorMarca?'✅':''}</div>
+          <div class="bc-name">${esc(ch.marca)} ${ch.marca===menorMarca?'✅':''}</div>
           <div class="bc-val">${brl(ch.med)}<span style="font-size:.7rem;font-weight:400">/un</span></div>
         </div>`).join('')}
       </div>

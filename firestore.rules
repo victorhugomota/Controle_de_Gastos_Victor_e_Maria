@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Regras de segurança do Firestore — Controle Financeiro Victor & Maria
+//
+// COMO APLICAR: Firebase Console → Firestore Database → aba "Regras" (Rules)
+// → apagar o conteúdo atual → colar este arquivo → trocar os 2 e-mails → "Publicar".
+//
+// O que estas regras garantem:
+//  - Só as contas Google listadas abaixo conseguem ler ou gravar dados.
+//  - Ninguém consegue APAGAR documentos (nem pelo site, nem por fora).
+//    O site usa a "Lixeira" (campo excluidoEm), então isso não atrapalha nada.
+//  - Publicar regras NÃO altera nem apaga nenhum dado existente.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autorizado() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'EMAIL_DO_VICTOR@gmail.com',
+          'EMAIL_DA_MARIA@gmail.com'
+        ];
+    }
+
+    function colecaoDoApp(colecao) {
+      return colecao in ['compras', 'entradas', 'faturas', 'boletos', 'reservas', 'estimativas'];
+    }
+
+    match /{colecao}/{id} {
+      allow read, create, update: if autorizado() && colecaoDoApp(colecao);
+      allow delete: if false;
+    }
+  }
+}
