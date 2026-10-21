@@ -313,6 +313,7 @@
     .icone-btn:hover{color:var(--text-main);background:var(--bg-card-hover)}
     .icone-btn.perigo:hover{color:#fb7185;border-color:rgba(244,63,94,.4)}
     .meses-cards{display:none}
+    .so-celular{display:none}
     .mes-card{background:rgba(0,0,0,.16);border:1px solid var(--border-color);border-radius:14px;padding:.9rem}
     .mes-card.mes-atual{border-color:rgba(255,197,50,.5)}
     .mes-card-topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
@@ -359,6 +360,8 @@
       .acoes-rapidas::-webkit-scrollbar{display:none}
       .acao-chip{flex-shrink:0}
       .tabela-resumo-wrap{display:none}
+      .col-pc{display:none}
+      .so-celular{display:block;margin-top:.15rem}
       .meses-cards{display:flex;flex-direction:column;gap:.65rem}
       .comp-controles > div{flex:1;min-width:0}
       .comp-controles select{min-width:0;width:100%}
@@ -5629,6 +5632,167 @@ function renderEstimativaCustos() {
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. MERCADO & PARSER NFC-e (INTEGRADO À ABA MERCADO)
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// LISTA MENSAL — PREVISÃO DE COMPRAS (somente leitura dos dados)
+// Base: últimos meses COMPLETOS (sem o mês atual), com peso maior para os recentes.
+// Essenciais (comprados em ≥ metade dos meses) entram item a item com o preço mais recente;
+// os ocasionais viram uma reserva com o valor médio gasto com eles, para o total
+// ficar próximo do que realmente se gasta.
+// ═══════════════════════════════════════════════════════════════════════════
+const MESES_BASE_PREVISAO = 6;
+
+const SECOES_MERCADO = [
+  { nome: '🍞 Padaria', re: /\b(PAO|PAES|BISNAG|TORRADA|BOLO|ROSCA|SONHO|CROISSANT)/ },
+  { nome: '🥩 Açougue & Frios', re: /\b(CARNE|BOV|SUIN|FRANGO|PEITO|COXA|SOBRECOXA|ASA|FILE|LINGUI|BACON|PRESUNTO|MUSSARELA|MUCARELA|QUEIJO|SALAME|MORTADELA|PEIXE|TILAPIA|ACEM|PATINHO|ALCATRA|COSTELA|PICANHA|MOIDA|HAMBURG|SALSICHA|PERU|BLANQUET|CALABRESA|PERNIL|LOMBO|COXAO|MAMINHA|FRALDINHA)/ },
+  { nome: '🥬 Hortifrúti & Ovos', re: /\b(BANANA|MACA|LARANJA|LIMAO|MAMAO|MELANCIA|MELAO|UVA|MORANGO|ABACAXI|MANGA|PERA|KIWI|TOMATE|CEBOLA|ALHO|BATATA|CENOURA|ALFACE|COUVE|REPOLHO|BROCOLIS|ABOBRINHA|ABOBORA|PEPINO|PIMENTAO|CHUCHU|BETERRABA|MANDIOCA|AIPIM|SALSA|COENTRO|RUCULA|OVO|OVOS|ABACATE|GOIABA|MARACUJA|TANGERINA|MEXERICA|VAGEM|BERINJELA|QUIABO|ESPINAFRE|AGRIAO)/ },
+  { nome: '🥛 Laticínios', re: /\b(LEITE|IOGURTE|IOG|REQUEIJAO|MANTEIGA|MARGARINA|CREME DE LEITE|BEBIDA LACTEA|NATA|COALHADA)/ },
+  { nome: '🧴 Higiene', re: /\b(SABONETE|SHAMPOO|SHAMP|CONDICIONADOR|CREME DENTAL|CR DENT|PASTA DENT|ESCOVA DENT|DESODOR|PAPEL HIG|PAP HIG|ABSORV|FRALDA|ALGODAO|COTONETE|HASTES|FIO DENTAL|PROTETOR|HIDRATANTE|LAMINA|ENXAGUANTE)/ },
+  { nome: '🧽 Limpeza', re: /\b(DETERG|SABAO|AMACIANTE|ALVEJANTE|AGUA SANITARIA|DESINFET|LIMPADOR|MULTIUSO|ESPONJA|PANO|SACO LIXO|SACO P LIXO|SACO PARA LIXO|VASSOURA|RODO|INSETICIDA|LUSTRA|ALCOOL|PAPEL TOALHA|PAPEL ALUM|FILME PVC|LAVA ROUPA|LAVA LOUCA|LIMPA)/ },
+  { nome: '🥤 Bebidas & Café', re: /\b(REFRIG|COCA|GUARANA|SUCO|AGUA MIN|AGUA C|AGUA S|CERVEJA|CERV|VINHO|ENERGETICO|CHA|CAFE|ACHOCOL|NESCAU|TODDY)/ },
+  { nome: '🐾 Pet', re: /\b(RACAO|AREIA|PETISCO|WHISKAS|PEDIGREE|GOLDEN|SACHE)/ }
+];
+const SECAO_PADRAO = '🥫 Mercearia & Outros';
+
+function normalizarTextoProduto(t) {
+  return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function secaoDoProduto(nome) {
+  const n = normalizarTextoProduto(nome);
+  return (SECOES_MERCADO.find(sx => sx.re.test(n)) || { nome: SECAO_PADRAO }).nome;
+}
+
+function ehItemPorPeso(item) {
+  return /^(KG|KGS|G|GR)$/i.test(String(item.unidade || '').trim());
+}
+
+function lerConfigLista(chave, padrao) {
+  try {
+    const v = parseFloat(localStorage.getItem('listaMensal.' + chave));
+    return isNaN(v) ? padrao : v;
+  } catch { return padrao; }
+}
+
+window.alterarConfigLista = function(chave, valor) {
+  const v = parseFloat(String(valor).replace(',', '.'));
+  if (isNaN(v) || v < 0) return;
+  try { localStorage.setItem('listaMensal.' + chave, String(v)); } catch {}
+  renderListaMensal();
+};
+
+// Gasto real de mercado no mês (valor pago, já com descontos)
+function gastoMercadoNoMes(m) {
+  return todasCompras.filter(c => c.mesAno === m).reduce((a, c) => a + (c.valorAPagar || 0), 0);
+}
+
+// Calcula a previsão para `mesAlvo` usando só meses anteriores a `mesLimite` (exclusivo)
+function calcularPrevisaoMercado(mesLimite) {
+  const comprasBase0 = todasCompras.filter(c => c.mesAno && c.mesAno < mesLimite);
+  const mesesBase = [...new Set(comprasBase0.map(c => c.mesAno))].sort().slice(-MESES_BASE_PREVISAO);
+  if (!mesesBase.length) return null;
+
+  const N = mesesBase.length;
+  // Peso linear: mês mais recente pesa N, o mais antigo pesa 1
+  const peso = {};
+  mesesBase.forEach((m, i) => { peso[m] = i + 1; });
+  const somaPesos = mesesBase.reduce((a, m) => a + peso[m], 0);
+  const mediaPonderada = porMes => mesesBase.reduce((a, m) => a + (porMes[m] || 0) * peso[m], 0) / somaPesos;
+
+  const comprasBase = comprasBase0.filter(c => mesesBase.includes(c.mesAno));
+
+  // Gasto real por mês e fator de desconto (itens vêm com preço cheio; o gasto real é o valor pago)
+  const gastoPorMes = {};
+  let somaPagoComItens = 0;
+  let somaItensBrutos = 0;
+  const semItensPorMes = {};
+  comprasBase.forEach(c => {
+    gastoPorMes[c.mesAno] = (gastoPorMes[c.mesAno] || 0) + (c.valorAPagar || 0);
+    const itens = c.itens || [];
+    if (itens.length) {
+      somaPagoComItens += c.valorAPagar || 0;
+      somaItensBrutos += itens.reduce((a, i) => a + (i.valorTotal || (i.quantidade || 1) * (i.valorUnitario || 0)), 0);
+    } else {
+      semItensPorMes[c.mesAno] = (semItensPorMes[c.mesAno] || 0) + (c.valorAPagar || 0);
+    }
+  });
+  const fatorDesconto = somaItensBrutos > 0 ? Math.min(1, Math.max(0.7, somaPagoComItens / somaItensBrutos)) : 1;
+
+  // Agrupa o mesmo produto: mesmo nome normalizado OU mesmo código na mesma loja
+  const pai = {};
+  const achar = k => { while (pai[k] !== k) { pai[k] = pai[pai[k]]; k = pai[k]; } return k; };
+  const unir = (a, b) => { pai[a] ??= a; pai[b] ??= b; const ra = achar(a), rb = achar(b); if (ra !== rb) pai[rb] = ra; };
+  const chavesDoItem = (c, item) => {
+    const ks = ['n:' + normalizarTextoProduto(item.nome)];
+    if (item.codigo) ks.push('c:' + normalizarTextoProduto(c.nomeMercado) + '|' + item.codigo);
+    return ks;
+  };
+  comprasBase.forEach(c => (c.itens || []).forEach(item => {
+    if (!item.nome) return;
+    const [k0, ...outras] = chavesDoItem(c, item);
+    pai[k0] ??= k0;
+    outras.forEach(k => unir(k0, k));
+  }));
+
+  const grupos = {};
+  const ordenadas = comprasBase.slice().sort((a, b) => String(a.dataEmissao || '').localeCompare(String(b.dataEmissao || '')));
+  ordenadas.forEach(c => (c.itens || []).forEach(item => {
+    if (!item.nome) return;
+    const raiz = achar(chavesDoItem(c, item)[0]);
+    const g = grupos[raiz] ||= { nome: item.nome, marca: item.marca || '', porPeso: false, qtdPorMes: {}, valorPorMes: {}, ultimoPreco: 0 };
+    const qtd = item.quantidade || 1;
+    const valor = item.valorTotal || qtd * (item.valorUnitario || 0);
+    g.qtdPorMes[c.mesAno] = (g.qtdPorMes[c.mesAno] || 0) + qtd;
+    g.valorPorMes[c.mesAno] = (g.valorPorMes[c.mesAno] || 0) + valor;
+    if (item.valorUnitario) g.ultimoPreco = item.valorUnitario; // compras em ordem de data: fica o mais recente
+    g.nome = item.nome;                                        // nome mais recente
+    if (item.marca) g.marca = item.marca;
+    if (ehItemPorPeso(item)) g.porPeso = true;
+  }));
+
+  const essenciais = [];
+  const ocasionaisPorMes = {};
+  let qtdOcasionais = 0;
+  Object.values(grupos).forEach(g => {
+    const mesesComCompra = Object.keys(g.qtdPorMes).length;
+    const qtdMedia = mediaPonderada(g.qtdPorMes);
+    // Itens por unidade com menos de ~1 un/mês (ex: comprado a cada 2 meses) não entram como
+    // "1 todo mês" — o valor deles vai para a reserva de ocasionais, que reflete o gasto real
+    const essencial = (N === 1 || mesesComCompra / N >= 0.5) && (g.porPeso || qtdMedia >= 0.75);
+    if (!essencial) {
+      qtdOcasionais++;
+      Object.entries(g.valorPorMes).forEach(([m, v]) => { ocasionaisPorMes[m] = (ocasionaisPorMes[m] || 0) + v; });
+      return;
+    }
+    const qtd = g.porPeso ? Math.max(0.1, Math.round(qtdMedia * 10) / 10) : Math.max(1, Math.round(qtdMedia));
+    const preco = g.ultimoPreco || (g.valorPorMes[Object.keys(g.valorPorMes).pop()] / (g.qtdPorMes[Object.keys(g.qtdPorMes).pop()] || 1));
+    essenciais.push({
+      nome: g.nome,
+      marca: g.marca,
+      secao: secaoDoProduto(g.nome),
+      porPeso: g.porPeso,
+      qtd,
+      preco,
+      subtotal: qtd * preco,
+      mesesComCompra,
+      totalMeses: N
+    });
+  });
+
+  const totalEssenciais = essenciais.reduce((a, i) => a + i.subtotal, 0);
+  const reservaOcasionais = mediaPonderada(ocasionaisPorMes);
+  // Itens vêm com preço cheio; o desconto médio das notas aparece numa linha separada
+  const descontoEstimado = (totalEssenciais + reservaOcasionais) * (1 - fatorDesconto);
+  const comprasSemItens = mediaPonderada(semItensPorMes);
+  const total = totalEssenciais + reservaOcasionais - descontoEstimado + comprasSemItens;
+
+  return {
+    mesesBase, N, fatorDesconto,
+    gastoMedioReal: mediaPonderada(gastoPorMes),
+    essenciais, totalEssenciais, reservaOcasionais, qtdOcasionais, descontoEstimado, comprasSemItens, total
+  };
+}
+
 function renderListaMensal() {
   const el = document.getElementById('lista-mensal-container');
   if (!el) return;
@@ -5636,223 +5800,176 @@ function renderListaMensal() {
   const agora = new Date();
   const proximoMesData = new Date(agora.getFullYear(), agora.getMonth() + 1, 1);
   const mesNome = proximoMesData.toLocaleString('pt-BR', { month: 'long' });
-  const ano = proximoMesData.getFullYear();
-  const mesAnoStr = `${mesNome.charAt(0).toUpperCase() + mesNome.slice(1)} de ${ano}`;
-
+  const mesAnoStr = `${mesNome.charAt(0).toUpperCase() + mesNome.slice(1)} de ${proximoMesData.getFullYear()}`;
   const diasUteis = getBusinessDaysInMonth(proximoMesData.getFullYear(), proximoMesData.getMonth());
 
-  const alimPorDia = 31.80;
-  const credPorDia = 20.00;
+  const alimPorDia = lerConfigLista('alimPorDia', 31.80);
+  const credPorDia = lerConfigLista('credPorDia', 20.00);
   const alimDisponivel = diasUteis * alimPorDia;
   const credDisponivel = diasUteis * credPorDia;
 
-  const porMes = {};
-  let totalGastoHistorico = 0;
-  todasCompras.forEach(c => {
-    const p = c.valorAPagar || 0;
-    totalGastoHistorico += p;
-    const mes = c.mesAno || 'Outros';
-    porMes[mes] = (porMes[mes] || 0) + p;
-  });
-  const numMesesHistorico = Math.max(1, Object.keys(porMes).length);
-  const mediaMensalHistorica = totalGastoHistorico / numMesesHistorico;
-
-  const agregadorItens = {};
-
-  todasCompras.forEach(c => {
-    (c.itens || []).forEach(item => {
-      const chave = (item.nome || '').toLowerCase().trim();
-      if (!chave) return;
-
-      if (!agregadorItens[chave]) {
-        agregadorItens[chave] = {
-          nome: item.nome,
-          marca: item.marca || 'Geral',
-          qtdTotal: 0,
-          frequenciaNotas: 0,
-          valoresUnitarios: []
-        };
-      }
-      agregadorItens[chave].qtdTotal += item.quantidade || 1;
-      agregadorItens[chave].frequenciaNotas += 1;
-      if (item.valorUnitario) agregadorItens[chave].valoresUnitarios.push(item.valorUnitario);
-    });
-  });
-
-  const listaBruta = Object.values(agregadorItens).map(i => {
-    const mediaUnit = i.valoresUnitarios.length > 0
-      ? i.valoresUnitarios.reduce((a, b) => a + b, 0) / i.valoresUnitarios.length
-      : 0;
-
-    const qtdMensalTaxa = i.qtdTotal / numMesesHistorico;
-    const intervaloMeses = numMesesHistorico / Math.max(1, i.frequenciaNotas);
-    const taxaFrequencia = i.frequenciaNotas / numMesesHistorico;
-    
-    let totalEstimadoUnidades = 0;
-    if (taxaFrequencia >= 0.35 || qtdMensalTaxa >= 0.7) {
-      totalEstimadoUnidades = Math.ceil(qtdMensalTaxa);
-    } else {
-      totalEstimadoUnidades = Math.round(qtdMensalTaxa);
-    }
-    if (totalEstimadoUnidades < 1 && i.frequenciaNotas >= numMesesHistorico) {
-      totalEstimadoUnidades = 1;
-    }
-
-    const subtotalCalculado = totalEstimadoUnidades * mediaUnit;
-
-    return {
-      nome: i.nome,
-      marca: i.marca,
-      frequenciaNotas: i.frequenciaNotas,
-      intervaloMeses,
-      qtdMensalTaxa,
-      totalEstimadoUnidades,
-      valorUnitario: mediaUnit,
-      subtotalCalculado
-    };
-  }).filter(i => i.totalEstimadoUnidades > 0);
-
-  listaBruta.sort((a, b) => b.frequenciaNotas - a.frequenciaNotas);
-
-  const somaSubtotaisInteiros = listaBruta.reduce((acc, item) => acc + item.subtotalCalculado, 0);
-
-  const metaLevementeAcima = mediaMensalHistorica > 0 ? mediaMensalHistorica * 1.05 : somaSubtotaisInteiros;
-
-  let fatorAjuste = 1;
-  if (somaSubtotaisInteiros > metaLevementeAcima && mediaMensalHistorica > 0) {
-    fatorAjuste = metaLevementeAcima / somaSubtotaisInteiros;
+  const mesAtual = mesAtualLocal();
+  let prev = calcularPrevisaoMercado(mesAtual);
+  let baseParcial = false;
+  if (!prev) {
+    // Só existe o mês atual: usa ele mesmo, avisando que a base é parcial
+    prev = calcularPrevisaoMercado('9999-99');
+    baseParcial = true;
   }
 
-  const listaPlanejada = listaBruta.map(i => ({
-    ...i,
-    subtotalFinal: i.subtotalCalculado * fatorAjuste
-  }));
+  if (!prev || (!prev.essenciais.length && !prev.total)) {
+    window.dadosListaMensalCache = null;
+    el.innerHTML = `<div class="card"><div class="empty-state">Adicione notas fiscais para que o sistema gere automaticamente sua lista mensal de compras.</div></div>`;
+    return;
+  }
 
-  const totalGeralEstimado = mediaMensalHistorica > 0 
-    ? Math.min(somaSubtotaisInteiros, metaLevementeAcima)
-    : somaSubtotaisInteiros;
+  // Acerto: prevê o último mês completo usando só os meses antes dele e compara com o gasto real
+  let acertoHtml = '<span class="card-subtext">Precisa de pelo menos 2 meses completos</span>';
+  const ultimoCompleto = prev.mesesBase[prev.mesesBase.length - 1];
+  if (!baseParcial && prev.N >= 2) {
+    const teste = calcularPrevisaoMercado(ultimoCompleto);
+    const real = gastoMercadoNoMes(ultimoCompleto);
+    if (teste && real > 0) {
+      const acerto = Math.max(0, 100 - Math.abs(teste.total - real) / real * 100);
+      const cor = acerto >= 85 ? '#34d399' : acerto >= 70 ? '#fbbf24' : '#fb7185';
+      acertoHtml = `<strong style="color:${cor}">${acerto.toFixed(0)}%</strong>
+        <span class="card-subtext" style="display:block">Para ${rotuloMes(ultimoCompleto)} o sistema teria previsto ${brl(teste.total)}; o gasto real foi ${brl(real)}.</span>`;
+    }
+  }
 
-  let restante = totalGeralEstimado;
+  const total = prev.total;
+  let restante = total;
+  const cobertoAlim = Math.min(restante, alimDisponivel); restante -= cobertoAlim;
+  const cobertoCred = Math.min(restante, credDisponivel); restante -= cobertoCred;
+  const cobertoDeb = Math.max(0, restante);
 
-  const cobertoAlim = Math.min(restante, alimDisponivel);
-  restante -= cobertoAlim;
+  const ordemSecoes = [...SECOES_MERCADO.map(sx => sx.nome), SECAO_PADRAO];
+  const porSecao = {};
+  prev.essenciais.forEach(i => { (porSecao[i.secao] ||= []).push(i); });
+  Object.values(porSecao).forEach(lista => lista.sort((a, b) => b.subtotal - a.subtotal));
+  const secoes = ordemSecoes.filter(n => porSecao[n]).map(n => ({ nome: n, itens: porSecao[n], total: porSecao[n].reduce((a, i) => a + i.subtotal, 0) }));
 
-  const cobertoCred = Math.min(restante, credDisponivel);
-  restante -= cobertoCred;
+  const baseTxt = `${rotuloMes(prev.mesesBase[0])}${prev.N > 1 ? ' a ' + rotuloMes(prev.mesesBase[prev.N - 1]) : ''} (${prev.N} ${prev.N > 1 ? 'meses' : 'mês'})`;
+  const fmtQtd = i => i.porPeso ? `${i.qtd.toFixed(1).replace('.', ',')} kg` : `${i.qtd} un`;
+  const freqTxt = i => i.mesesComCompra >= i.totalMeses ? 'Todo mês' : `${i.mesesComCompra} de ${i.totalMeses} meses`;
+  const difMedia = prev.gastoMedioReal ? ((total - prev.gastoMedioReal) / prev.gastoMedioReal) * 100 : 0;
 
-  const cobertoDeb = restante > 0 ? restante : 0;
+  window.dadosListaMensalCache = {
+    mesAnoStr, diasUteis, total, cobertoAlim, cobertoCred, cobertoDeb, secoes,
+    reservaOcasionais: prev.reservaOcasionais, qtdOcasionais: prev.qtdOcasionais, descontoEstimado: prev.descontoEstimado,
+    comprasSemItens: prev.comprasSemItens, baseTxt
+  };
 
-  let html = `
-    <div class="card" style="margin-bottom:1.5rem; background: linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95)); border: 1px solid #3b82f6;">
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1.25rem;border-color:rgba(96,165,250,.45)">
       <div class="card-header">
         <div>
-          <span class="card-title" style="color:#60a5fa;">📅 Previsão de Compras — ${mesAnoStr}</span>
-          <p class="card-subtext" style="color:#cbd5e1; margin-top:0.25rem;">
-            Calculado com unidades inteiras exatas (${diasUteis} dias úteis em ${mesNome}).
-          </p>
+          <span class="card-title" style="color:#60a5fa">📅 Previsão de Compras — ${mesAnoStr}</span>
+          <p class="card-subtext" style="margin-top:.25rem">Baseada em ${baseTxt}, com peso maior para os meses mais recentes${baseParcial ? ' · <strong style="color:#fbbf24">base parcial: só há compras do mês atual</strong>' : ''}.</p>
         </div>
-        <span class="badge green" style="font-size:0.8rem; padding:0.4rem 0.75rem;">${diasUteis} Dias Úteis</span>
+        <span class="badge green">${diasUteis} dias úteis</span>
       </div>
 
-      <div class="payment-grid" style="margin-top:1rem;">
-        <div class="payment-item" style="border-color: rgba(16,185,129,0.4);">
-          <div class="p-label">🍽️ Vale Alimentação (${diasUteis}d × R$ 31,80)</div>
-          <div class="p-val" style="color:#34d399;">${brl(cobertoAlim)} <span style="font-size:0.75rem;font-weight:normal;color:var(--text-muted)">/ ${brl(alimDisponivel)}</span></div>
+      <div class="kpi-grid" style="margin:1rem 0 .5rem">
+        <div class="kpi" style="--kpi-cor:#10b981">
+          <div class="kpi-label"><span>Total previsto</span></div>
+          <div class="kpi-valor" style="color:#34d399">${brl(total)}</div>
+          <div class="kpi-sub">Essenciais ${brl(prev.totalEssenciais)} + ocasionais ${brl(prev.reservaOcasionais + prev.comprasSemItens)}${prev.descontoEstimado > 0.005 ? ` − desconto ${brl(prev.descontoEstimado)}` : ''}</div>
         </div>
-        <div class="payment-item" style="border-color: rgba(99,102,241,0.4);">
-          <div class="p-label">💳 Cartão Crédito (${diasUteis}d × R$ 20,00)</div>
-          <div class="p-val" style="color:#818cf8;">${brl(cobertoCred)} <span style="font-size:0.75rem;font-weight:normal;color:var(--text-muted)">/ ${brl(credDisponivel)}</span></div>
+        <div class="kpi" style="--kpi-cor:#60a5fa">
+          <div class="kpi-label"><span>Gasto médio real</span></div>
+          <div class="kpi-valor" style="color:#60a5fa">${brl(prev.gastoMedioReal)}</div>
+          <div class="kpi-sub">Previsão ${difMedia >= 0 ? '+' : ''}${difMedia.toFixed(1)}% vs média (preços atualizados)</div>
         </div>
-        <div class="payment-item" style="border-color: ${cobertoDeb > 0 ? 'rgba(244,63,94,0.5)' : 'var(--border-color)'};">
+        <div class="kpi" style="--kpi-cor:#fbbf24">
+          <div class="kpi-label"><span>Acerto no último mês</span></div>
+          <div class="kpi-valor" style="font-size:1.25rem">${acertoHtml}</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:#a855f7">
+          <div class="kpi-label"><span>Itens na lista</span></div>
+          <div class="kpi-valor" style="color:#c084fc">${prev.essenciais.length}</div>
+          <div class="kpi-sub">+ ${prev.qtdOcasionais} itens ocasionais na reserva</div>
+        </div>
+      </div>
+
+      <div class="payment-grid">
+        <div class="payment-item" style="border-color:rgba(16,185,129,.4)">
+          <div class="p-label">🍽️ Vale Alimentação (${diasUteis}d × <input type="number" step="0.01" min="0" value="${alimPorDia}" onchange="alterarConfigLista('alimPorDia', this.value)" style="width:72px;background:transparent;border:1px solid var(--border-color);border-radius:6px;color:var(--text-main);padding:.1rem .3rem;font:inherit" aria-label="Vale alimentação por dia">/dia)</div>
+          <div class="p-val" style="color:#34d399">${brl(cobertoAlim)} <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">/ ${brl(alimDisponivel)}</span></div>
+        </div>
+        <div class="payment-item" style="border-color:rgba(99,102,241,.4)">
+          <div class="p-label">💳 Cartão Crédito (${diasUteis}d × <input type="number" step="0.01" min="0" value="${credPorDia}" onchange="alterarConfigLista('credPorDia', this.value)" style="width:72px;background:transparent;border:1px solid var(--border-color);border-radius:6px;color:var(--text-main);padding:.1rem .3rem;font:inherit" aria-label="Crédito por dia">/dia)</div>
+          <div class="p-val" style="color:#818cf8">${brl(cobertoCred)} <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">/ ${brl(credDisponivel)}</span></div>
+        </div>
+        <div class="payment-item" style="border-color:${cobertoDeb > 0 ? 'rgba(244,63,94,.5)' : 'var(--border-color)'}">
           <div class="p-label">💳 Débito Necessário (Excedente)</div>
-          <div class="p-val" style="color: ${cobertoDeb > 0 ? '#fb7185' : 'var(--text-muted)'};">${brl(cobertoDeb)}</div>
+          <div class="p-val" style="color:${cobertoDeb > 0 ? '#fb7185' : 'var(--text-muted)'}">${brl(cobertoDeb)}</div>
         </div>
-      </div>
-
-      <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-        <div>
-          <span style="font-size:0.85rem; color:var(--text-muted);">Total Estimado da Lista de Compras:</span>
-          <p style="font-size:0.75rem; color:#60a5fa;">Média Histórica de Gastos: ${brl(mediaMensalHistorica)}</p>
-        </div>
-        <span style="font-size:1.6rem; font-weight:800; color:var(--primary);">${brl(totalGeralEstimado)}</span>
       </div>
     </div>
 
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Lista de Itens com Frequência e Total Estimado</span>
-        <span class="badge amber">${listaPlanejada.length} itens cadastrados</span>
+        <span class="card-title">🧾 Lista de compras por seção</span>
+        <span class="badge amber">${prev.essenciais.length} itens</span>
       </div>
-      <p class="card-subtext" style="margin-bottom:1rem;">
-        O <strong>Total Estimado</strong> arredonda o consumo médio para cima (unidades inteiras exatas), pois os produtos são comprados por unidade no mercado.
-      </p>
-  `;
-
-  window.dadosListaMensalCache = {
-    mesAnoStr, diasUteis, totalGeralEstimado, cobertoAlim, cobertoCred, cobertoDeb, alimDisponivel, credDisponivel, lista: listaPlanejada
-  };
-
-  if (listaPlanejada.length === 0) {
-    html += `<div class="empty-state">Adicione notas fiscais para que o sistema gere automaticamente sua lista mensal de compras.</div></div>`;
-  } else {
-    html += `
+      <p class="card-subtext" style="margin-bottom:1rem">Itens comprados com frequência (pelo menos metade dos meses), com a quantidade média por mês e o <strong>preço da última compra</strong>.</p>
       <div class="table-responsive">
         <table class="custom-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Marca</th>
-              <th>Frequência de Compra</th>
-              <th class="num">Consumo Estimado/Mês</th>
-              <th class="num">Total Estimado</th>
-              <th class="num">Preço Unit. Médio</th>
-              <th class="num">Subtotal Mensal</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Item</th><th class="col-pc">Frequência</th><th class="num">Qtd/mês</th><th class="num col-pc">Último preço</th><th class="num">Subtotal</th></tr></thead>
           <tbody>
-            ${listaPlanejada.map(item => {
-              const freqStr = item.intervaloMeses > 1.2
-                ? `A cada ${item.intervaloMeses.toFixed(1)} meses`
-                : `Todo mês (${item.frequenciaNotas}x)`;
-              const qtdFmt = item.qtdMensalTaxa < 1
-                ? item.qtdMensalTaxa.toFixed(2)
-                : item.qtdMensalTaxa.toFixed(1);
-              const totalEstFmt = item.totalEstimadoUnidades.toFixed(1);
-
-              return `
+            ${secoes.map(sec => `
+              <tr><td colspan="5" style="background:rgba(0,0,0,.2);font-weight:800;font-size:.8rem;letter-spacing:.03em">${sec.nome} <span style="float:right;color:var(--text-muted)">${brl(sec.total)}</span></td></tr>
+              ${sec.itens.map(i => `
                 <tr>
-                  <td><strong>${esc(item.nome)}</strong></td>
-                  <td><span class="badge amber">${esc(item.marca)}</span></td>
-                  <td><span class="badge cyan">${freqStr}</span></td>
-                  <td class="num">${qtdFmt} un/mês</td>
-                  <td class="num"><span class="badge green" style="font-size:0.82rem;">${totalEstFmt}</span></td>
-                  <td class="num">${brl(item.valorUnitario)}</td>
-                  <td class="num"><strong>${brl(item.subtotalFinal)}</strong></td>
-                </tr>
-              `;
-            }).join('')}
+                  <td><strong>${esc(i.nome)}</strong>${i.marca ? ` <span class="badge amber" style="font-size:.66rem">${esc(i.marca)}</span>` : ''}
+                    <div class="card-subtext so-celular">${brl(i.preco)}${i.porPeso ? '/kg' : ''} · ${freqTxt(i)}</div></td>
+                  <td class="col-pc"><span class="badge cyan">${freqTxt(i)}</span></td>
+                  <td class="num"><strong>${fmtQtd(i)}</strong></td>
+                  <td class="num col-pc">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
+                  <td class="num"><strong>${brl(i.subtotal)}</strong></td>
+                </tr>`).join('')}`).join('')}
+            <tr><td colspan="5" style="background:rgba(0,0,0,.2);font-weight:800;font-size:.8rem">🧺 Ocasionais</td></tr>
+            <tr>
+              <td><strong>Reserva para itens ocasionais</strong><div class="card-subtext">${prev.qtdOcasionais} itens comprados de vez em quando</div></td>
+              <td class="col-pc"><span class="badge purple">Média mensal</span></td>
+              <td class="num">—</td><td class="num col-pc">—</td>
+              <td class="num"><strong>${brl(prev.reservaOcasionais)}</strong></td>
+            </tr>
+            ${prev.comprasSemItens > 0.005 ? `
+            <tr>
+              <td><strong>Compras sem itens detalhados</strong><div class="card-subtext">Notas cadastradas sem a lista de produtos</div></td>
+              <td class="col-pc"><span class="badge purple">Média mensal</span></td>
+              <td class="num">—</td><td class="num col-pc">—</td>
+              <td class="num"><strong>${brl(prev.comprasSemItens)}</strong></td>
+            </tr>` : ''}
+            ${prev.descontoEstimado > 0.005 ? `
+            <tr>
+              <td><strong>💸 Desconto médio nas notas</strong><div class="card-subtext">Vocês costumam pagar ${((1 - prev.fatorDesconto) * 100).toFixed(1)}% a menos que o preço cheio dos itens</div></td>
+              <td class="col-pc"></td><td class="num">—</td><td class="num col-pc">—</td>
+              <td class="num" style="color:#34d399"><strong>− ${brl(prev.descontoEstimado)}</strong></td>
+            </tr>` : ''}
           </tbody>
+          <tfoot>
+            <tr><td colspan="2" class="col-pc"></td><td colspan="2" style="font-weight:800">Total previsto</td><td class="num" style="font-weight:800;color:#34d399">${brl(total)}</td></tr>
+          </tfoot>
         </table>
       </div>
     </div>
-    
-    <div style="margin-top:1.5rem; text-align:center;">
-      <button type="button" class="btn-primary" onclick="exportarPDFListaMensal()" style="padding: 0.85rem 1.75rem; font-size: 1rem; box-shadow: 0 4px 15px var(--primary-glow);">
+
+    <div style="margin-top:1.5rem;text-align:center">
+      <button type="button" class="btn-primary" onclick="exportarPDFListaMensal()" style="padding:.85rem 1.75rem;font-size:1rem">
         📄 Exportar Lista em PDF / Imprimir
       </button>
     </div>`;
-  }
-
-  el.innerHTML = html;
 }
 
 window.exportarPDFListaMensal = function() {
-  if (!window.dadosListaMensalCache || !window.dadosListaMensalCache.lista.length) {
+  const d = window.dadosListaMensalCache;
+  if (!d || !d.secoes.length) {
     toastMsg('⚠️ Nenhuma lista mensal disponível para exportar.');
     return;
   }
-
-  const { mesAnoStr, diasUteis, totalGeralEstimado, cobertoAlim, cobertoCred, cobertoDeb, lista } = window.dadosListaMensalCache;
 
   const printWin = window.open('', '_blank', 'width=900,height=750');
   if (!printWin) {
@@ -5860,90 +5977,74 @@ window.exportarPDFListaMensal = function() {
     return;
   }
 
+  const fmtQtd = i => i.porPeso ? `${i.qtd.toFixed(1).replace('.', ',')} kg` : `${i.qtd} un`;
   const htmlContent = `
     <!DOCTYPE html>
     <html lang="pt-BR">
     <head>
       <meta charset="UTF-8">
-      <title>Lista de Compras - ${mesAnoStr}</title>
+      <title>Lista de Compras - ${d.mesAnoStr}</title>
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; color: #0f172a; padding: 25px; margin: 0; background: #fff; }
         .header-print { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 18px; }
-        .header-print h1 { font-size: 20px; margin: 0; color: #0f172a; }
+        .header-print h1 { font-size: 20px; margin: 0; }
         .header-print p { font-size: 13px; color: #475569; margin: 3px 0 0 0; }
-        .box-resumo { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 12px 15px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .box-resumo { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 8px; padding: 12px 15px; margin-bottom: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
         .res-item .label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: bold; }
-        .res-item .val { font-size: 15px; font-weight: bold; color: #0f172a; margin-top: 3px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-        th { background: #f1f5f9; text-align: left; padding: 8px 10px; border-bottom: 2px solid #cbd5e1; font-weight: 700; color: #334155; }
-        td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
-        .num { text-align: right; }
-        .check-col { width: 35px; text-align: center; }
+        .res-item .val { font-size: 15px; font-weight: bold; margin-top: 3px; }
+        h2 { font-size: 14px; margin: 18px 0 6px; padding: 6px 10px; background: #f1f5f9; border-left: 4px solid #0f172a; display: flex; justify-content: space-between; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; page-break-inside: auto; }
+        tr { page-break-inside: avoid; }
+        td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        .num { text-align: right; white-space: nowrap; }
+        .check-col { width: 28px; text-align: center; }
         .chk-box { width: 14px; height: 14px; border: 1.5px solid #64748b; border-radius: 3px; display: inline-block; }
-        .total-footer { margin-top: 20px; border-top: 2px solid #0f172a; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: bold; }
+        .marca { color: #64748b; font-size: 11px; }
+        .total-footer { margin-top: 20px; border-top: 2px solid #0f172a; padding-top: 10px; display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; }
         @media print { body { padding: 0; } }
       </style>
     </head>
     <body>
       <div class="header-print">
         <div>
-          <h1>🛒 Controle Mercado — Lista de Compras</h1>
-          <p>Previsão para <strong>${mesAnoStr}</strong> (${diasUteis} dias úteis)</p>
+          <h1>🛒 Lista de Compras — ${d.mesAnoStr}</h1>
+          <p>${d.diasUteis} dias úteis · baseada em ${d.baseTxt}</p>
         </div>
-        <div style="text-align:right;">
-          <p style="font-size:11px; color:#64748b;">Victor & Maria</p>
-        </div>
+        <p style="font-size:11px;color:#64748b">Victor & Maria</p>
       </div>
 
       <div class="box-resumo">
-        <div class="res-item">
-          <div class="label">🍽️ Vale Alimentação</div>
-          <div class="val">${brl(cobertoAlim)}</div>
-        </div>
-        <div class="res-item">
-          <div class="label">💳 Cartão Crédito</div>
-          <div class="val">${brl(cobertoCred)}</div>
-        </div>
-        <div class="res-item">
-          <div class="label">💳 Débito (Excedente)</div>
-          <div class="val">${brl(cobertoDeb)}</div>
-        </div>
+        <div class="res-item"><div class="label">🍽️ Vale Alimentação</div><div class="val">${brl(d.cobertoAlim)}</div></div>
+        <div class="res-item"><div class="label">💳 Cartão Crédito</div><div class="val">${brl(d.cobertoCred)}</div></div>
+        <div class="res-item"><div class="label">💳 Débito (Excedente)</div><div class="val">${brl(d.cobertoDeb)}</div></div>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th class="check-col">[  ]</th>
-            <th>Item</th>
-            <th>Marca</th>
-            <th class="num">Qtd. Estimada</th>
-            <th class="num">Preço Unit. Médio</th>
-            <th class="num">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lista.map(item => `
+      ${d.secoes.map(sec => `
+        <h2><span>${sec.nome}</span><span>${brl(sec.total)}</span></h2>
+        <table><tbody>
+          ${sec.itens.map(i => `
             <tr>
               <td class="check-col"><div class="chk-box"></div></td>
-              <td><strong>${esc(item.nome)}</strong></td>
-              <td>${esc(item.marca)}</td>
-              <td class="num"><strong>${item.totalEstimadoUnidades.toFixed(1)} un</strong></td>
-              <td class="num">${brl(item.valorUnitario)}</td>
-              <td class="num"><strong>${brl(item.subtotalFinal)}</strong></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+              <td><strong>${esc(i.nome)}</strong>${i.marca ? ` <span class="marca">${esc(i.marca)}</span>` : ''}</td>
+              <td class="num"><strong>${fmtQtd(i)}</strong></td>
+              <td class="num">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
+              <td class="num"><strong>${brl(i.subtotal)}</strong></td>
+            </tr>`).join('')}
+        </tbody></table>`).join('')}
+
+      <h2><span>🧺 Ocasionais</span><span>${brl(d.reservaOcasionais + d.comprasSemItens)}</span></h2>
+      <table><tbody>
+        <tr><td class="check-col"></td><td>Reserva para itens ocasionais (${d.qtdOcasionais} itens comprados de vez em quando)</td><td class="num"><strong>${brl(d.reservaOcasionais + d.comprasSemItens)}</strong></td></tr>
+      </tbody></table>
+      ${d.descontoEstimado > 0.005 ? `<p style="font-size:12px;color:#475569;margin-top:10px">💸 Desconto médio nas notas: − ${brl(d.descontoEstimado)}</p>` : ''}
 
       <div class="total-footer">
-        <span>Total Estimado da Compra:</span>
-        <span style="font-size:18px; color:#059669;">${brl(totalGeralEstimado)}</span>
+        <span>Total previsto da compra:</span>
+        <span style="font-size:18px;color:#059669">${brl(d.total)}</span>
       </div>
 
       <script>
-        window.onload = function() {
-          setTimeout(function() { window.print(); }, 350);
-        };
+        window.onload = function() { setTimeout(function() { window.print(); }, 350); };
       <\/script>
     </body>
     </html>
