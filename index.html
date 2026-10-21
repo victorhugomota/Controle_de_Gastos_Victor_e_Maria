@@ -1020,6 +1020,7 @@
 
     <!-- Container de Análise de Boletos Recorrentes -->
     <div id="container-analise-boletos-recorrentes"></div>
+    <div id="container-insights-boletos"></div>
 
     <!-- Lista de Boletos Registrados -->
     <div class="card">
@@ -1041,6 +1042,7 @@
       <button class="sub-item" data-sub="m-comparacao">📈 Comparar Preços</button>
       <button class="sub-item" data-sub="m-recorrencia">🔄 Itens &amp; Marcas</button>
       <button class="sub-item" data-sub="m-historico">📋 Histórico de Compras</button>
+      <button class="sub-item" data-sub="m-analises">📊 Análises</button>
     </div>
 
     <!-- Botão de escanear nota -->
@@ -1109,6 +1111,10 @@
     </div>
 
     <!-- SUB-ABA 4: HISTÓRICO -->
+    <div id="sub-m-analises" class="sub-tab-content" style="display:none">
+      <div id="mercado-analises-container"></div>
+    </div>
+
     <div id="sub-m-historico" class="sub-tab-content" style="display:none">
       <div class="card">
         <div class="card-header">
@@ -1238,6 +1244,37 @@
           💾 Salvar Configurações de Reserva
         </button>
       </form>
+    </div>
+
+    <!-- Depósitos e resgates + simulador -->
+    <div class="dash-grid-meio">
+      <div class="card">
+        <div class="card-header"><span class="card-title">🏦 Depósitos &amp; Resgates</span></div>
+        <p class="card-subtext" style="margin-bottom:.75rem">Registre cada valor guardado ou retirado. O "Saldo Real Guardado" é atualizado automaticamente.</p>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:.6rem">
+          <select id="mov-tipo" class="form-control" aria-label="Tipo">
+            <option value="deposito">⬆️ Depósito (guardei)</option>
+            <option value="resgate">⬇️ Resgate (retirei)</option>
+          </select>
+          <input id="mov-valor" type="number" step="0.01" min="0.01" class="form-control" placeholder="Valor R$" aria-label="Valor">
+          <input id="mov-data" type="date" class="form-control" aria-label="Data">
+          <input id="mov-desc" type="text" class="form-control" placeholder="Descrição (opcional)" aria-label="Descrição">
+        </div>
+        <button type="button" class="btn-primary" style="width:100%" onclick="registrarMovimentacaoReserva()">💾 Registrar</button>
+        <div id="lista-movimentacoes" style="margin-top:1rem"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">🧮 Simulador da Meta</span></div>
+        <label for="sim-valor-mensal" class="card-subtext" style="display:block;margin-bottom:.35rem">Se guardarmos por mês (R$):</label>
+        <input id="sim-valor-mensal" type="number" step="50" min="0" class="form-control" oninput="atualizarSimuladorReserva()">
+        <div id="sim-resultado" style="margin-top:1rem;font-size:.9rem;line-height:1.6"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="card-header"><span class="card-title">📈 Evolução do dinheiro guardado</span></div>
+      <div class="chart-container"><canvas id="chart-evolucao-reserva" aria-label="Gráfico da evolução das reservas"></canvas></div>
+      <div id="evolucao-reserva-vazio"></div>
     </div>
 
     <!-- Container da Lista de Análise Geral de Cada Mês -->
@@ -1532,6 +1569,13 @@ let todasEstimativas = [];
 let estimativasCarregadas = false;
 const mesesEstimativaVerificados = new Set();
 let dadosReservas = { metaMensal: 0, valorAtualGuardado: 0 };
+let reservasCarregadas = false;
+// Documentos novos dentro da coleção "reservas" (as regras do Firestore já permitem):
+//  - reservas/config-cartoes: categorias aprendidas e limites por categoria
+//  - reservas/movimentacoes: histórico de depósitos e resgates
+let configCartoes = {};
+let movimentacoesReserva = [];
+let movimentacoesCarregadas = false;
 
 let chartInst = null;
 let qrScanner = null;
@@ -1972,8 +2016,23 @@ onSnapshot(doc(db, COLL_RESERVAS, 'config'), snap => {
   if (snap.exists()) {
     dadosReservas = snap.data();
   }
+  reservasCarregadas = true;
   renderTudo();
 }, erroListener('Reservas'));
+
+// 4.1 Categorias aprendidas e limites dos cartões
+onSnapshot(doc(db, COLL_RESERVAS, 'config-cartoes'), snap => {
+  configCartoes = snap.exists() ? snap.data() : {};
+  renderTudo();
+}, erroListener('Config Cartões'));
+
+// 4.2 Depósitos e resgates das reservas
+onSnapshot(doc(db, COLL_RESERVAS, 'movimentacoes'), snap => {
+  const d = snap.exists() ? snap.data() : {};
+  movimentacoesReserva = Array.isArray(d.itens) ? d.itens : [];
+  movimentacoesCarregadas = true;
+  renderTudo();
+}, erroListener('Movimentações'));
 
 // 4.5 Escutar Estimativa de Custos
 onSnapshot(collection(db, COLL_ESTIMATIVAS), snap => {
@@ -2122,6 +2181,7 @@ function renderTudoAgora() {
   renderChartFluxoMensal();
   renderKpisMes();
   renderComparativo();
+  renderAnalisesMercado();
   renderChartSaidasTipo();
   reaplicarEstadoExpandido();
 }
@@ -2396,7 +2456,7 @@ function renderDashboardGeral() {
     porMesMercado[mes] = (porMesMercado[mes] || 0) + p;
   });
 
-  const saldoGuardado = (dadosReservas && dadosReservas.valorAtualGuardado !== undefined) ? dadosReservas.valorAtualGuardado : 3000;
+  const saldoGuardado = (dadosReservas && dadosReservas.valorAtualGuardado !== undefined) ? dadosReservas.valorAtualGuardado : 0;
   const saldoTotalComGuardado = somaSaldoLiquidoTabela + saldoGuardado;
 
   // Atualização dos Cards da Visão Geral (100% alinhados à tabela de resumo mensal)
@@ -3608,43 +3668,239 @@ window.fecharModalEstabelecimento = function() {
   if (modalEl) modalEl.style.display = 'none';
 };
 
+// Categorias do cartão. Palavras inteiras (\b) evitam falsos positivos como
+// "BAR" em "BARBEARIA" ou "MERCADO" em "MERCADO LIVRE". A ordem importa.
+const CATEGORIAS_CARTAO = [
+  { nome: 'Assinaturas & Serviços', icone: '📺', cor: 'purple', palavras: 'NETFLIX|SPOTIFY|DISNEY|DISNEY ?PLUS|HBO ?MAX|MAX ?COM|PRIME ?VIDEO|AMAZON ?PRIME|AMAZONPRIME|DEEZER|YOUTUBE|YOUTUBE ?PREMIUM|GOOGLE|GOOGLE ?ONE|ICLOUD|APPLE ?COM|MICROSOFT|PARAMOUNT|GLOBOPLAY|CRUNCHYROLL|CHATGPT|OPENAI|CANVA' },
+  { nome: 'Eletrônicos & Shopping', icone: '📱', cor: 'cyan', palavras: 'AMAZON|AMZN|MERCADO ?LIVRE|MERCADOLIVRE|MERCADOPAGO|MERCADO ?PAGO|MAGALU|MAGAZINE ?LUIZA|MAGAZINE|SHOPEE|ALIEXPRESS|FAST ?SHOP|APPLE|KABUM|AMERICANAS|SUBMARINO|CASAS ?BAHIA|TEMU' },
+  { nome: 'Vestuário & Roupas', icone: '👗', cor: 'rose', palavras: 'ZARA|RENNER|C ?A|CEA|RIACHUELO|ROUPAS?|VESTUARIO|SAPATOS?|CALCADOS?|CENTAURO|NIKE|ADIDAS|SHEIN|DAFITI|HERING|MARISA|NETSHOES' },
+  { nome: 'Viagens & Hospedagem', icone: '✈️', cor: 'purple', palavras: 'VIAGEM|VIAGENS|AIRBNB|BOOKING|HOTEL|HOTEIS|POUSADA|DECOLAR|LATAM|GOL ?LINHAS|VOEGOL|AZUL ?LINHAS|VOEAZUL|AZUL ?VIAGENS|FLIGHT|PASSAGEM|PASSAGENS|123MILHAS|MAXMILHAS' },
+  { nome: 'Transporte & Combustível', icone: '⛽', cor: 'amber', palavras: 'AUTO ?POSTO|POSTO|UBER|UBER ?TRIP|99 ?APP|99 ?POP|99 ?TAXI|99APP|99POP|SHELL|IPIRANGA|PETROBRAS|BR ?MANIA|COMBUSTIVEL|COMBUSTIVEIS|PEDAGIO|SEM ?PARAR|CONECTCAR|VELOE|ESTACIONAMENTO|ESTAPAR' },
+  { nome: 'Supermercado & Alimentação', icone: '🛒', cor: 'green', palavras: 'SAVEGNAGO|TONELLI|SUPERMERCADO|SUPERMERCADOS|SUPERMERC|MERCADO|MERCEARIA|ATACADAO|ASSAI|CARREFOUR|PAO ?DE ?ACUCAR|MARTINS|HORTIFRUTI|SACOLAO|ACOUGUE|PADARIA|EMPORIO' },
+  { nome: 'Restaurantes & Lazer', icone: '🍕', cor: 'orange', palavras: 'SORVETERIA|SORVETES?|PIZZA|PIZZARIA|BURGER|BURGUER|IFOOD|RESTAURANTE|BAR|BARES|PUB|LANCHONETE|LANCHES|DELICIAS|CHOCOLATES?|CACAU ?SHOW|CINEMA|CINEMARK|OUTBACK|MC ?DONALDS?|MCDONALDS|KFC|SUBWAY|STARBUCKS|CHURRASCARIA|ESPETINHO|BOTECO|CHOPP' },
+  { nome: 'Saúde & Cosméticos', icone: '💄', cor: 'pink', palavras: 'COSMETICO|COSMETICOS|FARMACIA|FARMACIAS|DROGARIA|DROGARIAS|DROGASIL|DROGA ?RAIA|RAIA|PAGUE ?MENOS|PERFUMARIA|NATURA|BOTICARIO|ESSENCIA|CLINICA|LABORATORIO|ODONTO|HOSPITAL|OTICA' }
+].map(c => ({ ...c, re: new RegExp('\\b(' + c.palavras + ')\\b') }));
+const CATEGORIA_OUTROS = { nome: 'Outros & Diversos', icone: '📦', cor: 'blue' };
+
+function chaveRegra(texto) {
+  return normalizarTextoProduto(texto).replace(/ /g, '_').slice(0, 120) || 'SEM_NOME';
+}
+
+function categoriaPorNome(nome) {
+  return CATEGORIAS_CARTAO.find(c => c.nome === nome) || CATEGORIA_OUTROS;
+}
+
 function categorizarItemCartao(descricao) {
-  if (!descricao) return { nome: 'Outros & Diversos', icone: '📦', cor: 'blue' };
-  const desc = descricao.toUpperCase();
+  if (!descricao) return CATEGORIA_OUTROS;
+  // 1º: regra aprendida (vocês corrigiram este estabelecimento antes)
+  const regra = configCartoes.regrasCategoria?.[chaveRegra(normalizarNomeEstabelecimento(descricao))];
+  if (regra) return { ...categoriaPorNome(regra), aprendida: true };
+  // 2º: palavras-chave
+  const desc = normalizarTextoProduto(descricao);
+  return CATEGORIAS_CARTAO.find(c => c.re.test(desc)) || CATEGORIA_OUTROS;
+}
 
-  if (desc.includes('ZARA') || desc.includes('RENNER') || desc.includes('C&A') || desc.includes('RIACHUELO') || 
-      desc.includes('ROUPA') || desc.includes('VESTUARIO') || desc.includes('SAPATO') || desc.includes('CALCADO') ||
-      desc.includes('CENTAURO') || desc.includes('NIKE') || desc.includes('ADIDAS') || desc.includes('SHEIN') || desc.includes('DAFITI')) {
-    return { nome: 'Vestuário & Roupas', icone: '👗', cor: 'rose' };
+window.salvarRegraCategoria = async function(chave, categoria) {
+  try {
+    await setDoc(doc(db, COLL_RESERVAS, 'config-cartoes'), {
+      regrasCategoria: { [chave]: categoria ? categoria : deleteField() }
+    }, { merge: true });
+    toastMsg(categoria ? `🏷️ Categoria salva: ${categoria}` : '🏷️ Voltou para a categoria automática');
+  } catch (err) {
+    alert('Erro ao salvar categoria: ' + err.message);
   }
-  if (desc.includes('VIAGEM') || desc.includes('AIRBNB') || desc.includes('BOOKING') || desc.includes('HOTEL') || 
-      desc.includes('POUSADA') || desc.includes('DECOLAR') || desc.includes('LATAM') || desc.includes('GOL') || 
-      desc.includes('AZUL') || desc.includes('FLIGHT') || desc.includes('PASSAGEM') || desc.includes('PASSAGENS')) {
-    return { nome: 'Viagens & Hospedagem', icone: '✈️', cor: 'purple' };
-  }
-  if (desc.includes('AUTOPOSTO') || desc.includes('POSTO') || desc.includes('UBER') || desc.includes('99') || 
-      desc.includes('SHELL') || desc.includes('IPIRANGA') || desc.includes('PETROBRAS') || desc.includes('COMBUSTIVEL') || desc.includes('PEDAGIO')) {
-    return { nome: 'Transporte & Combustível', icone: '⛽', cor: 'amber' };
-  }
-  if (desc.includes('SAVEGNAGO') || desc.includes('TONELLI') || desc.includes('SUPERMERCADO') || desc.includes('MERCADO') || 
-      desc.includes('ATACADAO') || desc.includes('CARREFOUR') || desc.includes('PAO DE ACUCAR') || desc.includes('MARTINS')) {
-    return { nome: 'Supermercado & Alimentação', icone: '🛒', cor: 'green' };
-  }
-  if (desc.includes('SORVETERIA') || desc.includes('PIZZA') || desc.includes('BURGER') || desc.includes('IFOOD') || 
-      desc.includes('RESTAURANTE') || desc.includes('BAR') || desc.includes('PUB') || desc.includes('DELICIAS') || 
-      desc.includes('CHOCOLATE') || desc.includes('CINEMA') || desc.includes('OUTBACK') || desc.includes('MC DONALDS') || desc.includes('KFC')) {
-    return { nome: 'Restaurantes & Lazer', icone: '🍕', cor: 'orange' };
-  }
-  if (desc.includes('COSMETICO') || desc.includes('COSMETICOS') || desc.includes('FARMACIA') || desc.includes('DROGARIA') || desc.includes('DROGASIL') || 
-      desc.includes('PAGUE MENOS') || desc.includes('PERFUMARIA') || desc.includes('NATURA') || desc.includes('BOTICARIO') || desc.includes('ESSENCIA')) {
-    return { nome: 'Saúde & Cosméticos', icone: '💄', cor: 'pink' };
-  }
-  if (desc.includes('AMAZON') || desc.includes('MERCADO LIVRE') || desc.includes('MAGALU') || desc.includes('MAGAZINE') || 
-      desc.includes('SHOPEE') || desc.includes('ALIEXPRESS') || desc.includes('FAST SHOP') || desc.includes('APPLE') || desc.includes('KABUM')) {
-    return { nome: 'Eletrônicos & Shopping', icone: '📱', cor: 'cyan' };
-  }
+};
 
-  return { nome: 'Outros & Diversos', icone: '📦', cor: 'blue' };
+window.salvarLimiteCategoria = async function(chave, valor) {
+  const v = parseFloat(String(valor).replace(',', '.'));
+  try {
+    await setDoc(doc(db, COLL_RESERVAS, 'config-cartoes'), {
+      limites: { [chave]: (!isNaN(v) && v > 0) ? v : deleteField() }
+    }, { merge: true });
+    toastMsg(!isNaN(v) && v > 0 ? `🎯 Limite salvo: ${brl(v)}` : '🎯 Limite removido');
+  } catch (err) {
+    alert('Erro ao salvar limite: ' + err.message);
+  }
+};
+
+function addMeses(mesAno, n) {
+  const [a, m] = mesAno.split('-').map(Number);
+  const d = new Date(a, m - 1 + n, 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+// Parcela no fim da descrição: "(03/10)", "PARCELA 3 DE 10" ou "3/10"
+function infoParcela(descricao) {
+  const s = String(descricao || '');
+  const m = s.match(/\((\d{1,2})\s*\/\s*(\d{1,2})\)\s*$/) ||
+            s.match(/PARC(?:ELA)?\.?\s*(\d{1,2})\s*(?:\/|DE)\s*(\d{1,2})/i) ||
+            s.match(/\b(\d{1,2})\s*\/\s*(\d{1,2})\s*$/);
+  if (!m) return null;
+  const k = +m[1], n = +m[2];
+  return (n >= 2 && n <= 48 && k >= 1 && k <= n) ? { k, n } : null;
+}
+
+const estiloBloco = 'background:rgba(0,0,0,.18);border:1px solid var(--border-color);border-radius:12px;padding:.9rem 1rem';
+
+// Planejamento do cartão: parcelas futuras, assinaturas, limites e categorias
+function renderHtmlInsightsCartao(faturas) {
+  if (!faturas || !faturas.length) return '';
+
+  // ── Parcelas futuras: usa só a fatura mais recente de cada cartão ──
+  const ultimaPorCartao = {};
+  faturas.forEach(f => {
+    const c = f.cartao || f.descricao || 'Cartão';
+    if (!f.mesAno) return;
+    if (!ultimaPorCartao[c] || f.mesAno > ultimaPorCartao[c].mesAno) ultimaPorCartao[c] = f;
+  });
+  const comprometido = {};
+  const parcelamentos = [];
+  Object.values(ultimaPorCartao).forEach(f => (f.itens || []).forEach(i => {
+    const p = infoParcela(i.descricao);
+    if (!p || p.k >= p.n || !i.valor) return;
+    const restantes = p.n - p.k;
+    for (let j = 1; j <= restantes; j++) {
+      const m = addMeses(f.mesAno, j);
+      comprometido[m] = (comprometido[m] || 0) + i.valor;
+    }
+    parcelamentos.push({ nome: normalizarNomeEstabelecimento(i.descricao), cartao: f.cartao || '', k: p.k, n: p.n, valor: i.valor, restante: i.valor * restantes, termina: addMeses(f.mesAno, restantes) });
+  }));
+  parcelamentos.sort((a, b) => b.restante - a.restante);
+  const mesesComprometidos = Object.keys(comprometido).sort().slice(0, 6);
+  const maxComp = Math.max(1, ...mesesComprometidos.map(m => comprometido[m]));
+  const totalRestante = parcelamentos.reduce((a, x) => a + x.restante, 0);
+
+  const parcelasHtml = !parcelamentos.length
+    ? '<div class="card-subtext">Nenhuma compra parcelada em andamento nas últimas faturas.</div>'
+    : `<div style="display:flex;flex-direction:column;gap:.45rem;margin-bottom:.85rem">
+        ${mesesComprometidos.map(m => `
+          <div style="display:grid;grid-template-columns:70px 1fr auto;gap:.6rem;align-items:center;font-size:.82rem">
+            <span style="color:var(--text-muted)">${rotuloMes(m)}</span>
+            <span class="barra-uso" style="width:100%;margin:0"><span style="width:${(comprometido[m] / maxComp) * 100}%;background:#f43f5e"></span></span>
+            <strong>${brl(comprometido[m])}</strong>
+          </div>`).join('')}
+      </div>
+      <div class="card-subtext" style="margin-bottom:.5rem">Total ainda a pagar em parcelas: <strong style="color:#fb7185">${brl(totalRestante)}</strong></div>
+      ${parcelamentos.slice(0, 6).map(x => `
+        <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;padding:.35rem 0;border-top:1px solid rgba(255,255,255,.05)">
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.nome)} <span class="badge rose" style="font-size:.66rem">${x.k}/${x.n}</span></span>
+          <span style="white-space:nowrap">${brl(x.valor)}/mês · até ${rotuloMes(x.termina)}</span>
+        </div>`).join('')}`;
+
+  // ── Assinaturas: mesmo estabelecimento, valor parecido, em 3+ meses ──
+  const porEstab = {};
+  faturas.forEach(f => (f.itens || []).forEach(i => {
+    if (!i.valor || !f.mesAno || infoParcela(i.descricao)) return;
+    const nome = normalizarNomeEstabelecimento(i.descricao);
+    const e = porEstab[nome] ||= { nome, porMes: {}, qtdPorMes: {} };
+    e.porMes[f.mesAno] = (e.porMes[f.mesAno] || 0) + i.valor;
+    e.qtdPorMes[f.mesAno] = (e.qtdPorMes[f.mesAno] || 0) + 1;
+  }));
+  const mesMaisRecente = faturas.map(f => f.mesAno).filter(Boolean).sort().pop();
+  if (!mesMaisRecente) return '';
+  const assinaturas = Object.values(porEstab).map(e => {
+    const meses = Object.keys(e.porMes).sort();
+    const vals = meses.map(m => e.porMes[m]).sort((a, b) => a - b);
+    const mediana = vals[Math.floor(vals.length / 2)];
+    const parecidos = vals.filter(v => Math.abs(v - mediana) <= mediana * 0.03).length;
+    const umaPorMes = meses.every(m => e.qtdPorMes[m] === 1);
+    return { ...e, meses, mediana, parecidos, umaPorMes, ultimo: meses[meses.length - 1] };
+  }).filter(e => e.meses.length >= 3 && e.umaPorMes && e.parecidos / e.meses.length >= 0.75 && e.ultimo >= addMeses(mesMaisRecente, -1))
+    .sort((a, b) => b.mediana - a.mediana);
+  const totalAssinaturas = assinaturas.reduce((a, x) => a + x.mediana, 0);
+  const assinaturasHtml = !assinaturas.length
+    ? '<div class="card-subtext">Nenhuma cobrança repetida todo mês com o mesmo valor foi encontrada.</div>'
+    : `<div class="card-subtext" style="margin-bottom:.5rem">≈ <strong style="color:#c084fc">${brl(totalAssinaturas)}/mês</strong> · ${brl(totalAssinaturas * 12)} por ano</div>
+      ${assinaturas.slice(0, 8).map(x => `
+        <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.82rem;padding:.4rem 0;border-top:1px solid rgba(255,255,255,.05)">
+          <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔁 ${esc(x.nome)} <span class="card-subtext">(${x.meses.length} meses)</span></span>
+          <strong style="white-space:nowrap">${brl(x.mediana)}</strong>
+        </div>`).join('')}`;
+
+  // ── Limites por categoria (mês da fatura mais recente) ──
+  const gastoCatMes = {};
+  faturas.filter(f => f.mesAno === mesMaisRecente).forEach(f => (f.itens || []).forEach(i => {
+    const c = categorizarItemCartao(i.descricao).nome;
+    gastoCatMes[c] = (gastoCatMes[c] || 0) + (i.valor || 0);
+  }));
+  const limites = configCartoes.limites || {};
+  const todasCats = [...CATEGORIAS_CARTAO, CATEGORIA_OUTROS];
+  const estourados = todasCats.filter(c => limites[chaveRegra(c.nome)] && (gastoCatMes[c.nome] || 0) > limites[chaveRegra(c.nome)]);
+  const limitesHtml = todasCats.map(c => {
+    const gasto = gastoCatMes[c.nome] || 0;
+    const lim = limites[chaveRegra(c.nome)] || 0;
+    const pct = lim ? (gasto / lim) * 100 : 0;
+    const cor = !lim ? '#64748b' : pct <= 80 ? '#34d399' : pct <= 100 ? '#fbbf24' : '#fb7185';
+    return `
+      <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px;gap:.6rem;align-items:center;font-size:.82rem;padding:.35rem 0">
+        <div style="min-width:0">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.icone} ${c.nome}</div>
+          <div class="card-subtext">${brl(gasto)}${lim ? ` de ${brl(lim)} · <strong style="color:${cor}">${pct.toFixed(0)}%</strong>` : ' · sem limite'}</div>
+        </div>
+        <span class="barra-uso" style="width:100%;margin:0"><span style="width:${Math.min(100, pct)}%;background:${cor}"></span></span>
+        <input type="number" min="0" step="10" placeholder="Limite R$" value="${lim || ''}" class="form-control" style="padding:.3rem .5rem;font-size:.8rem" onchange="salvarLimiteCategoria('${chaveRegra(c.nome)}', this.value)" aria-label="Limite mensal para ${c.nome}">
+      </div>`;
+  }).join('');
+
+  // ── Ajustar categorias: estabelecimentos dos últimos 3 meses ──
+  const desde = addMeses(mesMaisRecente, -2);
+  const estabs = {};
+  faturas.filter(f => f.mesAno >= desde).forEach(f => (f.itens || []).forEach(i => {
+    const nome = normalizarNomeEstabelecimento(i.descricao);
+    const e = estabs[nome] ||= { nome, valor: 0, exemplo: i.descricao };
+    e.valor += i.valor || 0;
+  }));
+  const regras = configCartoes.regrasCategoria || {};
+  const listaEstabs = Object.values(estabs).map(e => {
+    const chave = chaveRegra(e.nome);
+    const regra = regras[chave];
+    const auto = CATEGORIAS_CARTAO.find(c => c.re.test(normalizarTextoProduto(e.exemplo))) || CATEGORIA_OUTROS;
+    return { ...e, chave, regra, auto };
+  }).sort((a, b) => ((a.auto === CATEGORIA_OUTROS && !a.regra) ? -1 : 0) - ((b.auto === CATEGORIA_OUTROS && !b.regra) ? -1 : 0) || b.valor - a.valor)
+    .slice(0, 25);
+  const qtdOutros = listaEstabs.filter(e => e.auto === CATEGORIA_OUTROS && !e.regra).length;
+  const categoriasHtml = listaEstabs.map(e => `
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:.6rem;align-items:center;font-size:.82rem;padding:.35rem 0;border-top:1px solid rgba(255,255,255,.05)">
+      <div style="min-width:0">
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>${esc(e.nome)}</strong></div>
+        <div class="card-subtext">${brl(e.valor)} nos últimos 3 meses${e.regra ? ' · <span style="color:#34d399">ajustada por vocês</span>' : ''}</div>
+      </div>
+      <select class="form-control" style="padding:.3rem .5rem;font-size:.8rem" onchange="salvarRegraCategoria('${e.chave}', this.value)" aria-label="Categoria de ${esc(e.nome)}">
+        <option value="" ${!e.regra ? 'selected' : ''}>Automática (${e.auto.nome})</option>
+        ${[...CATEGORIAS_CARTAO, CATEGORIA_OUTROS].map(c => `<option value="${c.nome}" ${e.regra === c.nome ? 'selected' : ''}>${c.icone} ${c.nome}</option>`).join('')}
+      </select>
+    </div>`).join('');
+
+  return `
+    <div class="card" style="margin-bottom:1.5rem;border-color:rgba(255,197,50,.4)">
+      <div class="card-header">
+        <div>
+          <span class="card-title" style="color:#ffd766">🧭 Planejamento do Cartão</span>
+          <p class="card-subtext" style="margin-top:.2rem">Parcelas que ainda vão cair, assinaturas, limites por categoria e ajuste de categorias.</p>
+        </div>
+        ${estourados.length ? `<span class="badge red">⚠️ ${estourados.length} limite${estourados.length > 1 ? 's' : ''} estourado${estourados.length > 1 ? 's' : ''}</span>` : ''}
+      </div>
+      <div class="dash-grid-meio" style="margin-bottom:1rem">
+        <div style="${estiloBloco}">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:.65rem">📆 Parcelas futuras já comprometidas</div>
+          ${parcelasHtml}
+        </div>
+        <div style="${estiloBloco}">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:.65rem">🔁 Assinaturas e cobranças mensais</div>
+          ${assinaturasHtml}
+        </div>
+      </div>
+      <div style="${estiloBloco};margin-bottom:1rem">
+        <div style="font-weight:700;font-size:.9rem;margin-bottom:.35rem">🎯 Limites por categoria — ${rotuloMes(mesMaisRecente, true)}</div>
+        <div class="card-subtext" style="margin-bottom:.5rem">Digite um limite mensal; a barra fica amarela perto do limite e vermelha quando passa.</div>
+        ${limitesHtml}
+      </div>
+      <details style="${estiloBloco}">
+        <summary style="cursor:pointer;font-weight:700;font-size:.9rem">🏷️ Ajustar categorias${qtdOutros ? ` <span class="badge amber">${qtdOutros} em "Outros"</span>` : ''}</summary>
+        <div class="card-subtext" style="margin:.5rem 0">Escolha a categoria certa uma vez; as próximas compras do mesmo lugar já entram nela.</div>
+        ${categoriasHtml || '<div class="card-subtext">Sem estabelecimentos nos últimos meses.</div>'}
+      </details>
+    </div>`;
 }
 
 function renderHtmlAnaliseGastosCartao(faturas) {
@@ -3983,7 +4239,7 @@ function renderCartoesCredito() {
     `;
   }).join('');
 
-  el.innerHTML = analiseGastosCartao + analiseGeral + gruposHtml;
+  el.innerHTML = analiseGastosCartao + renderHtmlInsightsCartao(todasFaturas) + analiseGeral + gruposHtml;
 }
 
 function renderItensFatura(f) {
@@ -4469,11 +4725,135 @@ function renderHtmlAnaliseBoletosRecorrentes(boletos) {
   `;
 }
 
+function renderInsightsBoletos() {
+  const el = document.getElementById('container-insights-boletos');
+  if (!el) return;
+  if (!todosBoletos.length) { el.innerHTML = ''; return; }
+
+  const mesAlvo = addMeses(mesAtualLocal(), 1);
+  const porConta = {};
+  todosBoletos.forEach(b => {
+    if (!b.mesAno) return;
+    const nome = getNomeBoleto(b);
+    const c = porConta[nome] ||= { nome, porMes: {} };
+    c.porMes[b.mesAno] = (c.porMes[b.mesAno] || 0) + valorDocFinanceiro(b);
+  });
+
+  const media = arr => arr.length ? arr.reduce((a, v) => a + v, 0) / arr.length : 0;
+  const contas = Object.values(porConta).map(c => {
+    const anteriores = Object.keys(c.porMes).filter(m => m < mesAlvo).sort();
+    const ult3 = anteriores.slice(-3).map(m => c.porMes[m]);
+    const previsto = media(ult3);
+    const lancado = c.porMes[mesAlvo];
+    const todos = anteriores.map(m => c.porMes[m]);
+    const mTodos = media(todos);
+    const desvio = todos.length >= 3 ? Math.sqrt(media(todos.map(v => (v - mTodos) ** 2))) : null;
+    const ultimoMes = anteriores[anteriores.length - 1];
+    const valorUltimo = ultimoMes ? c.porMes[ultimoMes] : 0;
+    const antesDoUltimo = anteriores.slice(-4, -1).map(m => c.porMes[m]);
+    const mediaAntes = media(antesDoUltimo);
+    return {
+      ...c, anteriores, ult3, previsto, lancado,
+      ativa: ultimoMes && ultimoMes >= addMeses(mesAlvo, -3),
+      fixa: desvio !== null && mTodos > 0 && desvio / mTodos < 0.05,
+      variavel: desvio !== null && !(mTodos > 0 && desvio / mTodos < 0.05),
+      ultimoMes, valorUltimo, mediaAntes,
+      alta: mediaAntes > 0 && valorUltimo > mediaAntes * 1.15 ? (valorUltimo / mediaAntes - 1) * 100 : 0
+    };
+  }).filter(c => c.ativa || c.lancado !== undefined).sort((a, b) => (b.lancado ?? b.previsto) - (a.lancado ?? a.previsto));
+
+  const totalPrevisto = contas.reduce((a, c) => a + (c.lancado ?? c.previsto), 0);
+  const alertas = contas.filter(c => c.alta > 0).sort((a, b) => b.alta - a.alta);
+  const fixas = contas.filter(c => c.fixa);
+  const variaveis = contas.filter(c => c.variavel);
+  const totalFixas = fixas.reduce((a, c) => a + c.previsto, 0);
+  const mesesRenda = getMesesDisponiveis().filter(m => m < mesAtualLocal() && totaisDoMes(m).entradas > 0).sort().slice(-3);
+  const rendaMedia = media(mesesRenda.map(m => totaisDoMes(m).entradas));
+
+  // Pontualidade (boletos marcados como pagos)
+  const pagos = todosBoletos.filter(b => b.pago && b.dataPagamento && parseDataVencimento(b.dataVencimento));
+  const atrasados = pagos.filter(b => parseDataVencimento(b.dataPagamento) > parseDataVencimento(b.dataVencimento))
+    .sort((a, b) => String(b.dataVencimento).localeCompare(String(a.dataVencimento)));
+  const emDia = pagos.length - atrasados.length;
+  const pctEmDia = pagos.length ? Math.round(emDia / pagos.length * 100) : null;
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:1.5rem;border-color:rgba(255,197,50,.4)">
+      <div class="card-header">
+        <div>
+          <span class="card-title" style="color:#ffd766">🧭 Planejamento das Contas</span>
+          <p class="card-subtext" style="margin-top:.2rem">Previsão de ${rotuloMes(mesAlvo, true)}, contas que subiram, fixas × variáveis e pontualidade.</p>
+        </div>
+        <span class="badge purple">Previsto: ${brl(totalPrevisto)}</span>
+      </div>
+
+      <div class="kpi-grid" style="margin-bottom:1rem">
+        <div class="kpi" style="--kpi-cor:#a855f7">
+          <div class="kpi-label"><span>Previsto ${rotuloMes(mesAlvo)}</span></div>
+          <div class="kpi-valor" style="color:#c084fc">${brl(totalPrevisto)}</div>
+          <div class="kpi-sub">${contas.length} contas · média dos últimos 3 meses</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:#60a5fa">
+          <div class="kpi-label"><span>Contas fixas</span></div>
+          <div class="kpi-valor" style="color:#60a5fa">${brl(totalFixas)}</div>
+          <div class="kpi-sub">${fixas.length} fixas · ${variaveis.length} variáveis${rendaMedia ? ` · ${Math.round(totalFixas / rendaMedia * 100)}% da renda` : ''}</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:${alertas.length ? '#f43f5e' : '#10b981'}">
+          <div class="kpi-label"><span>Contas que subiram</span></div>
+          <div class="kpi-valor" style="color:${alertas.length ? '#fb7185' : '#34d399'}">${alertas.length}</div>
+          <div class="kpi-sub">mais de 15% acima da média recente</div>
+        </div>
+        <div class="kpi" style="--kpi-cor:#fbbf24">
+          <div class="kpi-label"><span>Pagos em dia</span></div>
+          <div class="kpi-valor" style="color:#fbbf24">${pctEmDia === null ? '—' : pctEmDia + '%'}</div>
+          <div class="kpi-sub">${pagos.length ? `${emDia} de ${pagos.length} boletos marcados como pagos` : 'Marque os boletos como pagos para acompanhar'}</div>
+        </div>
+      </div>
+
+      <div class="dash-grid-meio" style="margin-bottom:0">
+        <div style="${estiloBloco}">
+          <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">🔮 Previsão por conta — ${rotuloMes(mesAlvo, true)}</div>
+          ${contas.map(c => `
+            <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.82rem;padding:.4rem 0;border-top:1px solid rgba(255,255,255,.05)">
+              <div style="min-width:0">
+                <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong>${esc(c.nome)}</strong> ${c.fixa ? '<span class="badge cyan" style="font-size:.64rem">fixa</span>' : c.variavel ? '<span class="badge amber" style="font-size:.64rem">variável</span>' : ''}</div>
+                <div class="card-subtext">Últimos: ${c.ult3.map(v => brl(v)).join(' · ') || '—'}</div>
+              </div>
+              <div style="text-align:right;white-space:nowrap">
+                <strong>${brl(c.lancado ?? c.previsto)}</strong>
+                <div class="card-subtext">${c.lancado !== undefined ? '✅ já lançado' : 'previsto'}</div>
+              </div>
+            </div>`).join('') || '<div class="card-subtext">Sem contas recentes.</div>'}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem">
+          <div style="${estiloBloco}">
+            <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">🚨 Contas acima do normal</div>
+            ${alertas.map(c => `
+              <div style="font-size:.82rem;padding:.4rem 0;border-top:1px solid rgba(255,255,255,.05)">
+                <strong>${esc(c.nome)}</strong> <span class="badge red" style="font-size:.68rem">+${c.alta.toFixed(0)}%</span>
+                <div class="card-subtext">${rotuloMes(c.ultimoMes)}: ${brl(c.valorUltimo)} · média anterior ${brl(c.mediaAntes)}</div>
+              </div>`).join('') || '<div class="card-subtext">👏 Nenhuma conta veio mais de 15% acima da média recente.</div>'}
+          </div>
+          <div style="${estiloBloco}">
+            <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem">⏱️ Pontualidade</div>
+            ${!pagos.length ? '<div class="card-subtext">Use o botão "Marcar como pago" nos boletos para acompanhar se as contas são pagas em dia.</div>'
+              : atrasados.length ? atrasados.slice(0, 5).map(b => {
+                  const dias = Math.round((parseDataVencimento(b.dataPagamento) - parseDataVencimento(b.dataVencimento)) / 86400000);
+                  return `<div style="font-size:.82rem;padding:.35rem 0;border-top:1px solid rgba(255,255,255,.05)"><strong>${esc(getNomeBoleto(b))}</strong> <span class="badge red" style="font-size:.66rem">${dias} dia${dias > 1 ? 's' : ''} de atraso</span><div class="card-subtext">Venceu ${fmtDataVencimento(b.dataVencimento)} · pago ${fmtDataVencimento(b.dataPagamento)}</div></div>`;
+                }).join('')
+              : '<div class="card-subtext">✅ Todos os boletos marcados foram pagos até o vencimento.</div>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderBoletos() {
   const total = todosBoletos.reduce((acc, b) => acc + (b.valorTotal !== undefined ? b.valorTotal : (b.valor || 0)), 0);
   document.getElementById('badge-total-boletos').textContent = `${brl(total)} total`;
 
   renderHtmlAnaliseBoletosRecorrentes(todosBoletos);
+  renderInsightsBoletos();
 
   const el = document.getElementById('lista-boletos-registrados');
   if (!todosBoletos.length) {
@@ -5063,9 +5443,163 @@ document.getElementById('form-config-reservas').addEventListener('submit', async
   renderTudo();
 });
 
+// ═══ RESERVAS: depósitos/resgates, evolução e simulador ═══
+let sobraMediaParaSimulador = 0;
+let simuladorEditado = false;
+
+window.registrarMovimentacaoReserva = async function() {
+  if (!movimentacoesCarregadas || !reservasCarregadas) {
+    toastMsg('⏳ Aguarde, carregando as reservas do banco...');
+    return;
+  }
+  const tipo = document.getElementById('mov-tipo').value;
+  const valor = parseFloat(document.getElementById('mov-valor').value);
+  const data = document.getElementById('mov-data').value || dataHojeLocal();
+  const descricao = document.getElementById('mov-desc').value.trim();
+  if (!valor || valor <= 0) { alert('Informe um valor maior que zero.'); return; }
+
+  const saldoAtual = dadosReservas.valorAtualGuardado || 0;
+  const novoSaldo = Math.round((saldoAtual + (tipo === 'deposito' ? valor : -valor)) * 100) / 100;
+  if (!confirm(`${tipo === 'deposito' ? '⬆️ Depósito' : '⬇️ Resgate'} de ${brl(valor)} em ${fmtDataVencimento(data)}.\n\nSaldo guardado: ${brl(saldoAtual)} → ${brl(novoSaldo)}\n\nConfirmar?`)) return;
+
+  const novo = { id: 'mov_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8), tipo, valor, data, descricao, criadoEm: new Date().toISOString() };
+  try {
+    // Lote atômico: registra a movimentação e atualiza o saldo juntos
+    const batch = writeBatch(db);
+    batch.set(doc(db, COLL_RESERVAS, 'movimentacoes'), { itens: [...movimentacoesReserva, novo] }, { merge: true });
+    batch.set(doc(db, COLL_RESERVAS, 'config'), { valorAtualGuardado: novoSaldo, dataAtualizacao: new Date().toISOString() }, { merge: true });
+    await batch.commit();
+    document.getElementById('mov-valor').value = '';
+    document.getElementById('mov-desc').value = '';
+    toastMsg(`✅ ${tipo === 'deposito' ? 'Depósito' : 'Resgate'} registrado! Saldo: ${brl(novoSaldo)}`);
+  } catch (err) {
+    alert('Erro ao registrar: ' + err.message);
+  }
+};
+
+window.removerMovimentacaoReserva = async function(id) {
+  if (!movimentacoesCarregadas || !reservasCarregadas) return;
+  const mov = movimentacoesReserva.find(m => m.id === id);
+  if (!mov) return;
+  const saldoAtual = dadosReservas.valorAtualGuardado || 0;
+  const novoSaldo = Math.round((saldoAtual - (mov.tipo === 'deposito' ? mov.valor : -mov.valor)) * 100) / 100;
+  if (!confirm(`Remover o ${mov.tipo === 'deposito' ? 'depósito' : 'resgate'} de ${brl(mov.valor)} (${fmtDataVencimento(mov.data)})?\n\nO saldo guardado volta de ${brl(saldoAtual)} para ${brl(novoSaldo)}.`)) return;
+  try {
+    const batch = writeBatch(db);
+    batch.set(doc(db, COLL_RESERVAS, 'movimentacoes'), { itens: movimentacoesReserva.filter(m => m.id !== id) }, { merge: true });
+    batch.set(doc(db, COLL_RESERVAS, 'config'), { valorAtualGuardado: novoSaldo, dataAtualizacao: new Date().toISOString() }, { merge: true });
+    await batch.commit();
+    toastMsg('🗑️ Movimentação removida e saldo ajustado.');
+  } catch (err) {
+    alert('Erro ao remover: ' + err.message);
+  }
+};
+
+window.atualizarSimuladorReserva = function() {
+  simuladorEditado = true;
+  renderSimuladorReserva();
+};
+
+function renderSimuladorReserva() {
+  const inp = document.getElementById('sim-valor-mensal');
+  const el = document.getElementById('sim-resultado');
+  if (!inp || !el) return;
+  if (!simuladorEditado && document.activeElement !== inp) {
+    inp.value = Math.max(0, Math.round(sobraMediaParaSimulador / 50) * 50) || '';
+  }
+  const meta = dadosReservas.metaAnual || 0;
+  const real = dadosReservas.valorAtualGuardado || 0;
+  const porMes = parseFloat(inp.value) || 0;
+  const hoje = new Date();
+  const mesesAteDez = Math.max(1, 12 - hoje.getMonth());
+  if (!meta) {
+    el.innerHTML = '<div class="card-subtext">Cadastre a <strong>Meta Total</strong> no formulário acima para simular.</div>';
+    return;
+  }
+  const falta = Math.max(0, meta - real);
+  if (!falta) {
+    el.innerHTML = `🎉 A meta de <strong>${brl(meta)}</strong> já foi atingida! Guardado: <strong style="color:#34d399">${brl(real)}</strong>.`;
+    return;
+  }
+  const necessarioDez = falta / mesesAteDez;
+  let resultado;
+  if (porMes > 0) {
+    const meses = Math.ceil(falta / porMes);
+    const quando = addMeses(mesAtualLocal(), meses);
+    const noPrazo = meses <= mesesAteDez;
+    resultado = `Guardando <strong>${brl(porMes)}/mês</strong>, vocês atingem a meta de ${brl(meta)} em <strong style="color:${noPrazo ? '#34d399' : '#fbbf24'}">${rotuloMes(quando, true)}</strong> (${meses} ${meses > 1 ? 'meses' : 'mês'}).`;
+  } else {
+    resultado = 'Digite quanto pretendem guardar por mês.';
+  }
+  el.innerHTML = `
+    <div style="margin-bottom:.6rem">${resultado}</div>
+    <div class="card-subtext">Faltam ${brl(falta)}. Para chegar até dezembro: <strong style="color:#fbbf24">${brl(necessarioDez)}/mês</strong>.</div>
+    <div class="card-subtext">Sobra média dos meses completos: ${brl(sobraMediaParaSimulador)}/mês.</div>`;
+}
+
+function renderMovimentacoesReserva() {
+  const lista = document.getElementById('lista-movimentacoes');
+  if (lista) {
+    const ordenadas = movimentacoesReserva.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(b.criadoEm).localeCompare(String(a.criadoEm)));
+    lista.innerHTML = !ordenadas.length
+      ? '<div class="card-subtext">Nenhuma movimentação registrada ainda.</div>'
+      : ordenadas.slice(0, 8).map(m => `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-size:.84rem;padding:.45rem 0;border-top:1px solid rgba(255,255,255,.05)">
+            <div style="min-width:0">
+              <strong style="color:${m.tipo === 'deposito' ? '#34d399' : '#fb7185'}">${m.tipo === 'deposito' ? '+' : '−'} ${brl(m.valor)}</strong>
+              <span class="card-subtext"> · ${fmtDataVencimento(m.data)}${m.descricao ? ' · ' + esc(m.descricao) : ''}</span>
+            </div>
+            <button class="icone-btn perigo" onclick="removerMovimentacaoReserva('${esc(m.id)}')" title="Remover" aria-label="Remover movimentação">🗑️</button>
+          </div>`).join('') + (ordenadas.length > 8 ? `<div class="card-subtext" style="margin-top:.4rem">+ ${ordenadas.length - 8} mais antigas</div>` : '');
+  }
+  const inpData = document.getElementById('mov-data');
+  if (inpData && !inpData.value) inpData.value = dataHojeLocal();
+
+  // Evolução: parte do saldo antes dos registros e soma cada movimentação
+  const vazio = document.getElementById('evolucao-reserva-vazio');
+  const canvas = document.getElementById('chart-evolucao-reserva');
+  if (!canvas) return;
+  if (!movimentacoesReserva.length) {
+    if (typeof Chart !== 'undefined') Chart.getChart('chart-evolucao-reserva')?.destroy();
+    canvas.parentElement.style.display = 'none';
+    if (vazio) vazio.innerHTML = '<div class="empty-state" style="padding:1rem">Registre depósitos e resgates para ver a evolução do dinheiro guardado.</div>';
+    return;
+  }
+  canvas.parentElement.style.display = '';
+  if (vazio) vazio.innerHTML = '';
+  if (typeof Chart === 'undefined') return setTimeout(renderMovimentacoesReserva, 300);
+  const cronologica = movimentacoesReserva.slice().sort((a, b) => String(a.data).localeCompare(String(b.data)) || String(a.criadoEm).localeCompare(String(b.criadoEm)));
+  const somaMov = cronologica.reduce((acc, m) => acc + (m.tipo === 'deposito' ? m.valor : -m.valor), 0);
+  let saldo = (dadosReservas.valorAtualGuardado || 0) - somaMov;
+  const labels = ['Início'];
+  const valores = [saldo];
+  cronologica.forEach(m => { saldo += m.tipo === 'deposito' ? m.valor : -m.valor; labels.push(fmtDataVencimento(m.data)); valores.push(Math.round(saldo * 100) / 100); });
+  const meta = dadosReservas.metaAnual || 0;
+  Chart.getChart('chart-evolucao-reserva')?.destroy();
+  new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Guardado', data: valores, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.15)', fill: true, tension: .25, pointRadius: 4 },
+        ...(meta ? [{ label: 'Meta', data: labels.map(() => meta), borderColor: '#ffc532', borderDash: [6, 6], pointRadius: 0 }] : [])
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#cbd5e1' } }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${brl(c.raw)}` } } },
+      scales: {
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#8fa8bd', callback: v => 'R$' + v.toLocaleString('pt-BR') } },
+        x: { grid: { display: false }, ticks: { color: '#8fa8bd' } }
+      }
+    }
+  });
+}
+
 function renderReservasEEconomias() {
-  const metaAnual = (dadosReservas && dadosReservas.metaAnual !== undefined) ? dadosReservas.metaAnual : 15000;
-  const real = (dadosReservas && dadosReservas.valorAtualGuardado !== undefined) ? dadosReservas.valorAtualGuardado : 3000;
+  // Sem valores inventados: se não foram cadastrados, ficam em zero
+  const metaAnual = (dadosReservas && dadosReservas.metaAnual !== undefined) ? dadosReservas.metaAnual : 0;
+  const real = (dadosReservas && dadosReservas.valorAtualGuardado !== undefined) ? dadosReservas.valorAtualGuardado : 0;
 
   // Preencher os campos do formulário com os valores salvos
   const inpAnual = document.getElementById('inp-meta-anual');
@@ -5119,10 +5653,16 @@ function renderReservasEEconomias() {
   const saldoLiquidoAcumulado = totalEntradas - totalSaidasAcumuladas;
 
   // 4. PROJEÇÃO DO SISTEMA ATÉ O FIM DO ANO (baseada nas entradas e saídas de todos os meses)
-  const numMesesCadastrados = Math.max(1, meses.length);
-  const mediaEntradasMensal = totalEntradas / numMesesCadastrados;
-  const mediaSaidasMensal = totalSaidasAcumuladas / numMesesCadastrados;
-  const mediaSaldoLivreMensal = saldoLiquidoAcumulado / numMesesCadastrados;
+  // Médias só com meses COMPLETOS que têm entradas (o mês atual e o próximo, ainda
+  // vazios, puxavam a média de sobra para baixo)
+  const mesesProjecao = meses.filter(m => m < mesAtualLocal() && totaisDoMes(m).entradas > 0);
+  const baseProj = mesesProjecao.length ? mesesProjecao : meses;
+  const numMesesCadastrados = Math.max(1, baseProj.length);
+  const somaProj = baseProj.reduce((acc, m) => { const t = totaisDoMes(m); acc.e += t.entradas; acc.s += t.saidas; return acc; }, { e: 0, s: 0 });
+  const mediaEntradasMensal = somaProj.e / numMesesCadastrados;
+  const mediaSaidasMensal = somaProj.s / numMesesCadastrados;
+  const mediaSaldoLivreMensal = (somaProj.e - somaProj.s) / numMesesCadastrados;
+  sobraMediaParaSimulador = mediaSaldoLivreMensal;
 
   // Sobra mensal histórica prevista
   const sobraMensalEstimada = mediaSaldoLivreMensal > 0 ? mediaSaldoLivreMensal : 0;
@@ -5140,6 +5680,9 @@ function renderReservasEEconomias() {
       subRec.innerHTML = `⚠️ Sobra média de ${brl(sobraMensalEstimada)}/mês. Projeção de ${brl(totalProjetadoFimDoAno)} fica <strong style="color:#fb7185">${brl(difMeta)}</strong> abaixo da Meta de ${brl(metaAnual)}.`;
     }
   }
+
+  renderMovimentacoesReserva();
+  renderSimuladorReserva();
 
   // Card de Análise Inteligente de Economias
   const boxAnalise = document.getElementById('box-analise-reserva-detalhes');
@@ -6741,6 +7284,139 @@ function renderComparacao() {
 }
 
 // RECORRÊNCIA & MARCAS
+// Tipo de produto para comparar marcas. Palavras genéricas usam as duas primeiras
+// palavras para não misturar, por exemplo, "LEITE UHT" com "LEITE CONDENSADO".
+const PALAVRAS_GENERICAS_PRODUTO = new Set(['LEITE', 'CREME', 'SUCO', 'BISCOITO', 'BOLACHA', 'MOLHO', 'QUEIJO', 'PAO', 'CAFE', 'OLEO', 'SABAO', 'PAPEL', 'AGUA', 'ACUCAR', 'FARINHA', 'MASSA', 'CHA', 'IOGURTE', 'BEBIDA', 'REFRIGERANTE', 'REFRIG', 'CERVEJA', 'SACO', 'ESPONJA', 'FILE', 'CARNE', 'PEITO', 'DOCE', 'POLPA', 'SALGADINHO', 'TEMPERO', 'CALDO']);
+function categoriaParaMarcas(nome) {
+  const w = normalizarTextoProduto(nome).split(' ').filter(x => x.length > 1 && !/^\d/.test(x));
+  if (!w.length) return 'OUTROS';
+  return PALAVRAS_GENERICAS_PRODUTO.has(w[0]) && w[1] ? `${w[0]} ${w[1]}` : w[0];
+}
+
+function renderAnalisesMercado() {
+  const el = document.getElementById('mercado-analises-container');
+  if (!el) return;
+  if (!todasCompras.length) {
+    el.innerHTML = '<div class="card"><div class="empty-state">Adicione notas fiscais para ver as análises do mercado.</div></div>';
+    return;
+  }
+
+  const mesAtual = mesAtualLocal();
+  const media = arr => arr.length ? arr.reduce((a, v) => a + v, 0) / arr.length : 0;
+  const mesesCompletos = [...new Set(todasCompras.filter(c => c.mesAno && c.mesAno < mesAtual).map(c => c.mesAno))].sort().slice(-6);
+  const comprasBase = todasCompras.filter(c => mesesCompletos.includes(c.mesAno));
+  const gastoMes = m => todasCompras.filter(c => c.mesAno === m).reduce((a, c) => a + (c.valorAPagar || 0), 0);
+
+  // ── Indicadores ──
+  const gastoMedio = media(mesesCompletos.map(gastoMes));
+  const ticket = media(comprasBase.map(c => c.valorAPagar || 0));
+  const idas = mesesCompletos.length ? comprasBase.length / mesesCompletos.length : 0;
+  const hoje = new Date();
+  const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+  const gastoAtual = gastoMes(mesAtual);
+  const ritmo = gastoMedio * (hoje.getDate() / diasNoMes);
+
+  // ── Preço por produto, mês e loja ──
+  const chaveProd = nome => normalizarTextoProduto(nome);
+  const ordenadas = todasCompras.slice().sort((a, b) => String(a.dataEmissao || '').localeCompare(String(b.dataEmissao || '')));
+
+  // Inflação da família: variação de preço dos mesmos produtos entre meses seguidos,
+  // ponderada pelo quanto vocês gastaram com cada produto
+  const precoMes = {}; // mes -> produto -> { soma, qtd, gasto }
+  ordenadas.forEach(c => (c.itens || []).forEach(i => {
+    if (!c.mesAno || !i.valorUnitario) return;
+    const k = chaveProd(i.nome);
+    const pm = (precoMes[c.mesAno] ||= {})[k] ||= { soma: 0, n: 0, gasto: 0 };
+    pm.soma += i.valorUnitario; pm.n += 1; pm.gasto += i.valorTotal || i.valorUnitario * (i.quantidade || 1);
+  }));
+  const mesesPreco = Object.keys(precoMes).sort().slice(-7);
+  const inflacao = [];
+  let acumulado = 1;
+  for (let x = 1; x < mesesPreco.length; x++) {
+    const ant = precoMes[mesesPreco[x - 1]], at = precoMes[mesesPreco[x]];
+    let pesoTot = 0, soma = 0, n = 0;
+    Object.keys(at).forEach(k => {
+      if (!ant[k]) return;
+      const r = (at[k].soma / at[k].n) / (ant[k].soma / ant[k].n);
+      if (!isFinite(r) || r <= 0 || r > 3 || r < 0.33) return; // ignora erros de leitura
+      soma += r * ant[k].gasto; pesoTot += ant[k].gasto; n++;
+    });
+    if (n >= 3 && pesoTot > 0) {
+      const v = soma / pesoTot;
+      acumulado *= v;
+      inflacao.push({ mes: mesesPreco[x], pct: (v - 1) * 100, n });
+    }
+  }
+  const inflAcum = (acumulado - 1) * 100;
+
+  // Onde é mais barato: último preço de cada produto em cada loja (últimos 6 meses)
+  const desde = addMeses(mesAtual, -6);
+  const precoLoja = {}; // produto -> loja -> preço
+  const nomesProd = {};
+  ordenadas.filter(c => c.mesAno >= desde).forEach(c => (c.itens || []).forEach(i => {
+    if (!i.valorUnitario) return;
+    const k = chaveProd(i.nome);
+    const loja = (c.nomeMercado || 'Mercado').trim().toUpperCase();
+    (precoLoja[k] ||= {})[loja] = i.valorUnitario;
+    nomesProd[k] = i.nome;
+  }));
+  const comparaveis = Object.entries(precoLoja).filter(([, lojas]) => Object.keys(lojas).length >= 2).map(([k, lojas]) => {
+    const lista = Object.entries(lojas).sort((a, b) => a[1] - b[1]);
+    const [lojaBarata, menor] = lista[0];
+    const maior = lista[lista.length - 1][1];
+    return { nome: nomesProd[k], lojas: lista, lojaBarata, menor, maior, economia: (maior - menor) / maior * 100 };
+  }).sort((a, b) => b.economia - a.economia);
+  const vitorias = {};
+  comparaveis.forEach(c => { vitorias[c.lojaBarata] = (vitorias[c.lojaBarata] || 0) + 1; });
+  const rankingLojas = Object.entries(vitorias).sort((a, b) => b[1] - a[1]);
+
+  el.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi" style="--kpi-cor:#10b981">
+        <div class="kpi-label"><span>Gasto médio/mês</span></div>
+        <div class="kpi-valor" style="color:#34d399">${brl(gastoMedio)}</div>
+        <div class="kpi-sub">${mesesCompletos.length} meses completos · ${brl(gastoMedio / 4.33)}/semana</div>
+      </div>
+      <div class="kpi" style="--kpi-cor:#60a5fa">
+        <div class="kpi-label"><span>Ticket médio</span></div>
+        <div class="kpi-valor" style="color:#60a5fa">${brl(ticket)}</div>
+        <div class="kpi-sub">${idas.toFixed(1).replace('.', ',')} idas ao mercado por mês</div>
+      </div>
+      <div class="kpi" style="--kpi-cor:${gastoAtual > ritmo * 1.1 ? '#f43f5e' : '#fbbf24'}">
+        <div class="kpi-label"><span>${rotuloMes(mesAtual)} até agora</span></div>
+        <div class="kpi-valor" style="color:${gastoAtual > ritmo * 1.1 ? '#fb7185' : '#fbbf24'}">${brl(gastoAtual)}</div>
+        <div class="kpi-sub">No ritmo normal seria ~${brl(ritmo)} até o dia ${hoje.getDate()}</div>
+      </div>
+      <div class="kpi" style="--kpi-cor:${inflAcum > 0 ? '#f43f5e' : '#10b981'}">
+        <div class="kpi-label"><span>Inflação da família</span></div>
+        <div class="kpi-valor" style="color:${inflAcum > 0 ? '#fb7185' : '#34d399'}">${inflacao.length ? (inflAcum > 0 ? '+' : '') + inflAcum.toFixed(1) + '%' : '—'}</div>
+        <div class="kpi-sub">${inflacao.length ? `Mesmos produtos, ${rotuloMes(mesesPreco[0])} → ${rotuloMes(mesesPreco[mesesPreco.length - 1])}` : 'Precisa de 2 meses com os mesmos produtos'}</div>
+      </div>
+    </div>
+
+    <div class="dash-grid-meio">
+      <div class="card">
+        <div class="card-header"><span class="card-title">📈 Variação de preço mês a mês</span></div>
+        <p class="card-subtext" style="margin-bottom:.75rem">Quanto os mesmos produtos ficaram mais caros ou mais baratos em relação ao mês anterior.</p>
+        ${inflacao.length ? inflacao.map(x => `
+          <div style="display:flex;justify-content:space-between;font-size:.85rem;padding:.45rem 0;border-top:1px solid rgba(255,255,255,.05)">
+            <span>${rotuloMes(x.mes, true)} <span class="card-subtext">(${x.n} produtos)</span></span>
+            <span class="delta ${x.pct > 0.25 ? 'ruim' : x.pct < -0.25 ? 'bom' : 'neutro'}">${x.pct > 0 ? '▲' : x.pct < 0 ? '▼' : '='} ${Math.abs(x.pct).toFixed(1)}%</span>
+          </div>`).join('') : '<div class="empty-state" style="padding:1rem">Ainda não há produtos repetidos em meses seguidos.</div>'}
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">🏪 Onde é mais barato</span></div>
+        ${!comparaveis.length ? '<div class="empty-state" style="padding:1rem">Comprem o mesmo produto em mercados diferentes para comparar.</div>' : `
+          <p class="card-subtext" style="margin-bottom:.6rem">Mercado com o menor preço em mais produtos: ${rankingLojas.map(([l, n], i) => `<strong style="color:${i === 0 ? '#34d399' : 'inherit'}">${esc(l)}</strong> (${n})`).join(' · ')}</p>
+          ${comparaveis.slice(0, 10).map(c => `
+            <div style="font-size:.82rem;padding:.45rem 0;border-top:1px solid rgba(255,255,255,.05)">
+              <div style="display:flex;justify-content:space-between;gap:.5rem"><strong style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.nome)}</strong><span class="delta bom">-${c.economia.toFixed(0)}%</span></div>
+              <div class="card-subtext">${c.lojas.map(([l, v], i) => `${i === 0 ? '✅ ' : ''}${esc(l)}: ${brl(v)}`).join(' · ')}</div>
+            </div>`).join('')}`}
+      </div>
+    </div>`;
+}
+
 function renderRecorrencia() {
   const elRec   = document.getElementById('lista-recorrencia');
   const elMarc  = document.getElementById('lista-marcas');
@@ -6756,7 +7432,7 @@ function renderRecorrencia() {
       agr[chave].notas += 1;
       agr[chave].units.push(item.valorUnitario || 0);
 
-      const cat = (item.nome || '').split(' ')[0].toUpperCase();
+      const cat = categoriaParaMarcas(item.nome);
       if (!byCategoria[cat]) byCategoria[cat] = {};
       const marca = item.marca || 'Genérica';
       if (!byCategoria[cat][marca]) byCategoria[cat][marca] = [];
