@@ -1355,6 +1355,31 @@
   </div>
 </div>
 
+<div id="modal-editar-fatura" class="modal-overlay">
+  <div class="modal-box" style="max-width: 460px;">
+    <div class="modal-header">
+      <h2>✏️ Editar Valor da Fatura</h2>
+      <button type="button" class="btn-close" onclick="fecharModalEditarFatura()" aria-label="Fechar">&times;</button>
+    </div>
+    <form id="form-editar-fatura">
+      <input type="hidden" id="inp-edit-fatura-id">
+      <input type="hidden" id="inp-edit-fatura-index">
+      <div class="form-group">
+        <label for="inp-edit-fatura-desc">Lançamento:</label>
+        <input type="text" id="inp-edit-fatura-desc" class="form-control" readonly style="opacity:0.8;background:rgba(0,0,0,0.25);cursor:not-allowed">
+      </div>
+      <div class="form-group">
+        <label for="inp-edit-fatura-valor">Novo Valor (R$):</label>
+        <input type="number" step="0.01" min="0.01" id="inp-edit-fatura-valor" class="form-control" placeholder="0.00" required>
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+        <button type="button" class="btn-secondary" style="flex:1;padding:.75rem" onclick="fecharModalEditarFatura()">Cancelar</button>
+        <button type="submit" class="btn-primary" style="flex:1;padding:.75rem">💾 Salvar Alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="modal-editar-boleto" class="modal-overlay">
   <div class="modal-box" style="max-width: 460px;">
     <div class="modal-header">
@@ -4404,7 +4429,10 @@ function renderItensFatura(f) {
           <td><strong>${i.dataCompra || '—'}</strong></td>
           <td>${esc(i.descricao)}</td>
           <td class="num" style="color:#fb7185"><strong>${brl(i.valor)}</strong></td>
-          <td><button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="removerItemFaturaCadastrada('${f.id}', ${idx})">🗑️ Excluir</button></td>
+          <td><div style="display:flex;gap:.35rem;align-items:center">
+            ${f.itens.length === 1 ? `<button class="btn-secondary" style="padding:.2rem .5rem; font-size:.78rem;" onclick="editarItemFatura('${f.id}', ${idx})" title="Editar o valor deste lançamento">✏️ Editar</button>` : ''}
+            <button class="btn-danger" style="padding:.2rem .5rem; font-size:.78rem;" onclick="removerItemFaturaCadastrada('${f.id}', ${idx})">🗑️ Excluir</button>
+          </div></td>
         </tr>`).join('')}</tbody>
       </table></div>
     `;
@@ -4418,6 +4446,48 @@ function renderItensFatura(f) {
     </tr></tbody>
   </table></div>`;
 }
+
+window.editarItemFatura = function(faturaId, itemIndex) {
+  const fatura = todasFaturas.find(f => f.id === faturaId);
+  const item = fatura?.itens?.[itemIndex];
+  if (!item) return;
+  document.getElementById('inp-edit-fatura-id').value = faturaId;
+  document.getElementById('inp-edit-fatura-index').value = itemIndex;
+  document.getElementById('inp-edit-fatura-desc').value = item.descricao || 'Lançamento';
+  document.getElementById('inp-edit-fatura-valor').value = (item.valor || 0).toFixed(2);
+  document.getElementById('modal-editar-fatura').classList.add('active');
+  setTimeout(() => { const inp = document.getElementById('inp-edit-fatura-valor'); inp?.focus(); inp?.select(); }, 100);
+};
+
+window.fecharModalEditarFatura = function() {
+  document.getElementById('modal-editar-fatura')?.classList.remove('active');
+};
+
+document.getElementById('form-editar-fatura').addEventListener('submit', async e => {
+  e.preventDefault();
+  const faturaId = document.getElementById('inp-edit-fatura-id').value;
+  const idx = parseInt(document.getElementById('inp-edit-fatura-index').value);
+  const novoValor = parseFloat(document.getElementById('inp-edit-fatura-valor').value);
+  if (!faturaId || isNaN(idx) || isNaN(novoValor) || novoValor <= 0) {
+    alert('Por favor, informe um valor numérico válido maior que zero.');
+    return;
+  }
+  const fatura = todasFaturas.find(f => f.id === faturaId);
+  if (!fatura?.itens?.[idx]) return;
+
+  // Atualiza só o valor do lançamento e o total da fatura
+  const novosItens = fatura.itens.map((i, k) => k === idx ? { ...i, valor: novoValor } : i);
+  const novoTotal = Math.round(novosItens.reduce((a, i) => a + (i.valor || 0), 0) * 100) / 100;
+  const campos = { itens: novosItens, valorTotal: novoTotal, dataAtualizacao: new Date().toISOString() };
+  if (fatura.valor !== undefined) campos.valor = novoTotal;
+  try {
+    await updateDoc(doc(db, COLL_FATURAS, faturaId), campos);
+    fecharModalEditarFatura();
+    toastMsg(`✏️ Fatura atualizada para ${brl(novoTotal)}!`);
+  } catch (err) {
+    alert('Erro ao atualizar a fatura: ' + err.message);
+  }
+});
 
 window.removerItemFaturaCadastrada = async function(faturaId, itemIndex) {
   const fatura = todasFaturas.find(f => f.id === faturaId);
