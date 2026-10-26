@@ -6856,6 +6856,203 @@ function normalizarTextoProduto(t) {
     .toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// NOMES AMIGÁVEIS DE PRODUTOS (só exibição; o nome original da nota não muda)
+// "L COND ITALAC 395G" → "Leite Condensado 395g - Marca Italac"
+// Funciona para produtos novos: tipo por abreviação, marca conhecida, tamanho
+// e descrições; o que não for reconhecido fica com a primeira letra maiúscula.
+// ═══════════════════════════════════════════════════════════════════════════
+const TIPOS_PRODUTO = {
+  // Laticínios e frios
+  'L COND': 'Leite Condensado', 'LEITE COND': 'Leite Condensado', 'LT COND': 'Leite Condensado',
+  'L UHT': 'Leite UHT', 'LEITE UHT': 'Leite UHT', 'L PO': 'Leite em Pó', 'LEITE PO': 'Leite em Pó',
+  'L FERM': 'Leite Fermentado', 'LEITE': 'Leite',
+  'CR LEITE': 'Creme de Leite', 'CREME LEITE': 'Creme de Leite', 'CR DE LEITE': 'Creme de Leite', 'CREME DE LEITE': 'Creme de Leite',
+  'REQ': 'Requeijão', 'REQUEIJ': 'Requeijão', 'REQUEIJAO': 'Requeijão', 'MARG': 'Margarina', 'MARGARINA': 'Margarina',
+  'MANT': 'Manteiga', 'MANTEIGA': 'Manteiga',
+  'QJ PARM': 'Queijo Parmesão', 'QJ PARMESAO': 'Queijo Parmesão', 'QUEIJO PARM': 'Queijo Parmesão',
+  'QJ MUSS': 'Queijo Muçarela', 'QJ MUC': 'Queijo Muçarela', 'QJ MUSSARELA': 'Queijo Muçarela', 'QUEIJO MUSSARELA': 'Queijo Muçarela',
+  'QJ PRATO': 'Queijo Prato', 'QJ MINAS': 'Queijo Minas', 'QJ COALHO': 'Queijo Coalho', 'QJ': 'Queijo', 'QUEIJO': 'Queijo',
+  'IOG NAT': 'Iogurte Natural', 'IOG': 'Iogurte', 'IOGURTE': 'Iogurte', 'BEB LAC': 'Bebida Láctea', 'BEBIDA LACTEA': 'Bebida Láctea',
+  'PRES': 'Presunto', 'PRESUNTO': 'Presunto', 'MORT': 'Mortadela', 'MORTADELA': 'Mortadela', 'SALS': 'Salsicha', 'SALSICHA': 'Salsicha',
+  'LING': 'Linguiça', 'LINGUICA': 'Linguiça', 'PEITO PERU': 'Peito de Peru', 'BACON': 'Bacon', 'SALAME': 'Salame',
+  // Carnes
+  'PEITO FGO': 'Peito de Frango', 'PTO FGO': 'Peito de Frango', 'FILE PEITO': 'Filé de Peito', 'FILE DE PEITO': 'Filé de Peito',
+  'FGO': 'Frango', 'FRANGO': 'Frango', 'COXA SOBRECOXA': 'Coxa e Sobrecoxa', 'CARNE MOIDA': 'Carne Moída', 'CARNE': 'Carne',
+  // Mercearia
+  'ARROZ': 'Arroz', 'FEIJ': 'Feijão', 'FEIJAO': 'Feijão', 'MAC': 'Macarrão', 'MACARRAO': 'Macarrão', 'MASSA': 'Massa',
+  'FAR TRIGO': 'Farinha de Trigo', 'FARINHA TRIGO': 'Farinha de Trigo', 'FAR MANDIOCA': 'Farinha de Mandioca', 'FAR': 'Farinha', 'FARINHA': 'Farinha',
+  'ACUC': 'Açúcar', 'ACUCAR': 'Açúcar', 'CAFE': 'Café', 'OLEO': 'Óleo', 'AZEITE': 'Azeite', 'VINAGRE': 'Vinagre',
+  'MOL TOM': 'Molho de Tomate', 'MOLHO TOM': 'Molho de Tomate', 'MOLHO DE TOMATE': 'Molho de Tomate', 'MOLHO': 'Molho',
+  'EXT TOM': 'Extrato de Tomate', 'EXTRATO TOM': 'Extrato de Tomate', 'MAION': 'Maionese', 'MAIONESE': 'Maionese',
+  'CATCHUP': 'Ketchup', 'KETCHUP': 'Ketchup', 'MOST': 'Mostarda', 'MOSTARDA': 'Mostarda',
+  'BISC': 'Biscoito', 'BISCOITO': 'Biscoito', 'BOLACHA': 'Bolacha', 'WAFER': 'Wafer', 'TORRADA': 'Torrada',
+  'CHOC': 'Chocolate', 'CH': 'Chocolate', 'CHOCOLATE': 'Chocolate', 'ACHOC': 'Achocolatado', 'ACHOCOLATADO': 'Achocolatado',
+  'COCO R': 'Coco Ralado', 'COCO RAL': 'Coco Ralado', 'AMEND': 'Amendoim', 'AMENDOIM': 'Amendoim',
+  'AVEIA': 'Aveia', 'GRAN': 'Granola', 'GRANOLA': 'Granola', 'CEREAL': 'Cereal', 'GELAT': 'Gelatina', 'GELATINA': 'Gelatina',
+  'PAO FORMA': 'Pão de Forma', 'PAO': 'Pão', 'ATUM': 'Atum', 'SARDINHA': 'Sardinha', 'MILHO': 'Milho', 'ERVILHA': 'Ervilha',
+  'TEMP': 'Tempero', 'TEMPERO': 'Tempero', 'CALDO': 'Caldo',
+  // Higiene
+  'SBT': 'Sabonete', 'SAB LIQ': 'Sabonete Líquido', 'SABONETE': 'Sabonete', 'SAB': 'Sabonete',
+  'SH': 'Shampoo', 'SHAMP': 'Shampoo', 'SHAMPOO': 'Shampoo', 'CONDIC': 'Condicionador', 'CONDICIONADOR': 'Condicionador',
+  'CR DENT': 'Creme Dental', 'CREME DENT': 'Creme Dental', 'C DENT': 'Creme Dental', 'CREME DENTAL': 'Creme Dental',
+  'ESC DENT': 'Escova de Dente', 'ESCOVA DENT': 'Escova de Dente', 'FIO DENT': 'Fio Dental', 'ENX BUCAL': 'Enxaguante Bucal',
+  'DESOD': 'Desodorante', 'DES': 'Desodorante', 'DESODORANTE': 'Desodorante',
+  'PAP HIG': 'Papel Higiênico', 'PAPEL HIG': 'Papel Higiênico', 'P HIG': 'Papel Higiênico', 'PAPEL HIGIENICO': 'Papel Higiênico',
+  'ABS': 'Absorvente', 'ABSORV': 'Absorvente', 'FRALDA': 'Fralda', 'COTONETE': 'Cotonete', 'ALGODAO': 'Algodão',
+  // Limpeza
+  'TOALHA': 'Papel Toalha', 'PAP TOALHA': 'Papel Toalha', 'PAPEL TOALHA': 'Papel Toalha',
+  'DET': 'Detergente', 'DETERG': 'Detergente', 'DETERGENTE': 'Detergente',
+  'AM': 'Amaciante', 'AMAC': 'Amaciante', 'AMACIANTE': 'Amaciante',
+  'SAB PO': 'Sabão em Pó', 'SABAO PO': 'Sabão em Pó', 'SABAO EM PO': 'Sabão em Pó', 'SAB LIQ ROUPA': 'Sabão Líquido',
+  'ALV': 'Alvejante', 'ALVEJANTE': 'Alvejante', 'AG SANIT': 'Água Sanitária', 'AGUA SANIT': 'Água Sanitária', 'AGUA SANITARIA': 'Água Sanitária',
+  'DESINF': 'Desinfetante', 'DESINFETANTE': 'Desinfetante', 'LIMP': 'Limpador', 'LIMPADOR': 'Limpador', 'MULTIUSO': 'Multiuso',
+  'ESP': 'Esponja', 'ESPONJA': 'Esponja', 'SACO LIXO': 'Saco de Lixo', 'SC LIXO': 'Saco de Lixo', 'PAPEL ALUM': 'Papel Alumínio', 'FILME PVC': 'Filme PVC',
+  // Bebidas
+  'REFRIG': 'Refrigerante', 'REFRI': 'Refrigerante', 'REFRIGERANTE': 'Refrigerante', 'SUCO': 'Suco', 'NECTAR': 'Néctar',
+  'AGUA MIN': 'Água Mineral', 'AG MIN': 'Água Mineral', 'AGUA': 'Água', 'CERV': 'Cerveja', 'CERVEJA': 'Cerveja',
+  'ENERG': 'Energético', 'ENERGETICO': 'Energético', 'CHA': 'Chá', 'VINHO': 'Vinho',
+  // Pet
+  'RACAO': 'Ração', 'AREIA': 'Areia Sanitária', 'PETISCO': 'Petisco'
+};
+
+// Marcas conhecidas (abreviação na nota → nome). Várias palavras são testadas antes.
+const MARCAS_PRODUTO = {
+  'TIO JOAO': 'Tio João', '3 CORACOES': '3 Corações', 'PINHO SOL': 'Pinho Sol', 'ORAL B': 'Oral-B', 'COCA COLA': 'Coca-Cola',
+  'DEL VALLE': 'Del Valle', 'SAO BRAZ': 'São Braz', 'KIT KAT': 'KitKat', 'NATURAL ONE': 'Natural One', 'MOCA': 'Moça',
+  'ITALAC': 'Italac', 'NESTLE': 'Nestlé', 'DAN': 'Danone', 'DANONE': 'Danone', 'HEINZ': 'Heinz', 'SOCOCO': 'Sococo',
+  'MILI': 'Mili', 'CROK': 'Crokíssimo', 'TEIX': 'Teixeira', 'TEIXEIRA': 'Teixeira', 'REX': 'Rexona', 'REXONA': 'Rexona',
+  'ELS': 'Elseve', 'ELSEVE': 'Elseve', 'COMFORT': 'Comfort', 'DOVE': 'Dove', 'TRENTO': 'Trento', 'BAUDUCCO': 'Bauducco', 'BAUD': 'Bauducco',
+  'PANCO': 'Panco', 'QUALITA': 'Qualitá', 'SADIA': 'Sadia', 'PERDIGAO': 'Perdigão', 'SEARA': 'Seara', 'CAMIL': 'Camil',
+  'URBANO': 'Urbano', 'LIZA': 'Liza', 'SOYA': 'Soya', 'YPE': 'Ypê', 'PILAO': 'Pilão', 'MELITTA': 'Melitta', 'VIGOR': 'Vigor',
+  'PARMALAT': 'Parmalat', 'KRAFT': 'Kraft', 'PIRACANJUBA': 'Piracanjuba', 'PIRAC': 'Piracanjuba', 'TIROL': 'Tirol', 'BATAVO': 'Batavo',
+  'ITAMBE': 'Itambé', 'ELEGE': 'Elegê', 'AURORA': 'Aurora', 'FRIBOI': 'Friboi', 'MAGGI': 'Maggi', 'KNORR': 'Knorr',
+  'HELLMANNS': "Hellmann's", 'HELLM': "Hellmann's", 'QUERO': 'Quero', 'ELEFANTE': 'Elefante', 'PREDILECTA': 'Predilecta',
+  'OMO': 'Omo', 'ASSOLAN': 'Assolan', 'BOMBRIL': 'Bombril', 'VEJA': 'Veja', 'COLGATE': 'Colgate', 'SORRISO': 'Sorriso',
+  'NIVEA': 'Nivea', 'PALMOLIVE': 'Palmolive', 'LUX': 'Lux', 'PROTEX': 'Protex', 'NEVE': 'Neve', 'PERSONAL': 'Personal',
+  'SCOTT': 'Scott', 'SNOB': 'Snob', 'LACTA': 'Lacta', 'GAROTO': 'Garoto', 'ARCOR': 'Arcor', 'HERSHEYS': "Hershey's",
+  'PURINA': 'Purina', 'PEDIGREE': 'Pedigree', 'WHISKAS': 'Whiskas', 'PEPSI': 'Pepsi', 'ANTARCTICA': 'Antarctica',
+  'SKOL': 'Skol', 'BRAHMA': 'Brahma', 'HEINEKEN': 'Heineken', 'AMSTEL': 'Amstel', 'MINALBA': 'Minalba', 'CRYSTAL': 'Crystal',
+  'NESCAU': 'Nescau', 'TODDY': 'Toddy', 'NINHO': 'Ninho', 'MOLICO': 'Molico', 'DANONINHO': 'Danoninho', 'ACTIVIA': 'Activia',
+  'YAKULT': 'Yakult', 'CAMPONESA': 'Camponesa', 'PANTENE': 'Pantene', 'SEDA': 'Seda', 'TRESEMME': 'TRESemmé',
+  'DOWNY': 'Downy', 'BRILHANTE': 'Brilhante', 'TIXAN': 'Tixan', 'ARIEL': 'Ariel', 'LIMPOL': 'Limpol', 'MINUANO': 'Minuano',
+  'HARPIC': 'Harpic', 'LYSOFORM': 'Lysoform', 'KALIPTO': 'Kalipto', 'SBP': 'SBP', 'RAID': 'Raid', 'BIS': 'Bis', 'OREO': 'Oreo',
+  'TOSTINES': 'Tostines', 'ADRIA': 'Adria', 'RENATA': 'Renata', 'BARILLA': 'Barilla', 'KIKALDO': 'Kicaldo', 'KICALDO': 'Kicaldo',
+  'GALLO': 'Gallo', 'ANDORINHA': 'Andorinha', 'CARBONELL': 'Carbonell', 'COCAMAR': 'Cocamar', 'UNIAO': 'União', 'CRISTAL': 'Cristal'
+};
+
+// Marcas que já dizem o tipo do produto quando a nota não traz o tipo
+const TIPO_PELA_MARCA = {
+  'Trento': 'Chocolate', 'Bis': 'Chocolate', 'KitKat': 'Chocolate', 'Lacta': 'Chocolate', 'Garoto': 'Chocolate',
+  'Nescau': 'Achocolatado', 'Toddy': 'Achocolatado', 'Yakult': 'Leite Fermentado', 'Danoninho': 'Iogurte',
+  'Activia': 'Iogurte', 'Omo': 'Sabão em Pó', 'Bombril': 'Esponja de Aço', 'Comfort': 'Amaciante', 'Downy': 'Amaciante',
+  'Pepsi': 'Refrigerante', 'Coca-Cola': 'Refrigerante', 'Moça': 'Leite Condensado', 'Oreo': 'Biscoito', 'Tostines': 'Biscoito'
+};
+
+const DESCRITORES_PRODUTO = {
+  'TRAD': 'Tradicional', 'TRADIC': 'Tradicional', 'ORIG': 'Original', 'INT': 'Integral', 'INTEG': 'Integral', 'DESN': 'Desnatado',
+  'SEMI': 'Semidesnatado', 'SEMIDESN': 'Semidesnatado', 'ZERO': 'Zero', 'LIGHT': 'Light', 'DIET': 'Diet', 'SAL': 'Salgado',
+  'S SAL': 'sem Sal', 'C SAL': 'com Sal', 'RA': 'Ralado', 'RAL': 'Ralado', 'FAT': 'Fatiado', 'MEN': 'Men', 'CUID': 'Cuidado',
+  'LEITE': 'ao Leite', 'AO': '', 'PO': 'em Pó', 'LIQ': 'Líquido', 'NAT': 'Natural', 'TOM': 'Tomate', 'PIC': 'Picante',
+  'MORANGO': 'Morango', 'BAUN': 'Baunilha', 'CHOC': 'Chocolate', 'LIMAO': 'Limão', 'OLEO': 'Óleo', 'EXT': 'Extraordinário',
+  'SH': 'Shampoo', 'CD': 'Condicionador', 'COND': 'Condicionador', 'TP1': 'Tipo 1', 'T1': 'Tipo 1', 'PCT': '', 'PT': '',
+  'UN': '', 'CX': 'Caixa', 'LT': 'Lata', 'GF': 'Garrafa', 'PET': 'PET', 'REF': 'Refil', 'REFIL': 'Refil', 'FR': 'Frasco',
+  'CONC': 'Concentrado', 'CONCENT': 'Concentrado', 'PREM': 'Premium', 'TRAD.': 'Tradicional', 'SACHE': 'Sachê', 'BCO': 'Branco',
+  'FRANCES': 'Francês', 'FRANGO': 'de Frango', 'FGO': 'de Frango', 'PTO': 'Preto', 'CAR': 'Carioca', 'PARB': 'Parboilizado', 'AGULHINHA': 'Agulhinha', 'ESPAG': 'Espaguete', 'PARAF': 'Parafuso'
+};
+
+const PALAVRAS_MINUSCULAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'com', 'sem', 'em', 'ao', 'para']);
+function capitalizarPalavra(p) {
+  const low = p.toLowerCase();
+  return PALAVRAS_MINUSCULAS.has(low) ? low : low.charAt(0).toUpperCase() + low.slice(1);
+}
+
+// Tamanho/peso: 395G, 1,01K, 1,5L, 600FL, 3R, 4X90G, 12UN
+function formatarTamanho(tok) {
+  let m = tok.match(/^(\d+)X(\d+(?:[.,]\d+)?)(G|GR|ML|L|KG|K)?$/);
+  if (m) return `${m[1]}x${m[2].replace('.', ',')}${m[3] ? unidadeTamanho(m[3]) : ''}`;
+  m = tok.match(/^(\d+(?:[.,]\d+)?)(G|GR|KG|K|ML|L|LT|LTS|UN|UND|FL|FLS|M|MT|MTS|R|ROL|ROLOS|CM|CAPS|SACHES?)$/);
+  if (m) {
+    const num = m[1].replace('.', ',');
+    const un = m[2];
+    if (/^(FL|FLS)$/.test(un)) return `${num} folhas`;
+    if (/^(R|ROL|ROLOS)$/.test(un)) return `${num} rolos`;
+    if (/^(UN|UND)$/.test(un)) return `${num} un`;
+    if (/^(M|MT|MTS)$/.test(un)) return `${num}m`;
+    if (/^CAPS$/.test(un)) return `${num} cápsulas`;
+    if (/^SACHES?$/.test(un)) return `${num} sachês`;
+    return num + unidadeTamanho(un);
+  }
+  return null;
+}
+function unidadeTamanho(u) {
+  return { G: 'g', GR: 'g', KG: 'kg', K: 'kg', ML: 'ml', L: 'L', LT: 'L', LTS: 'L', CM: 'cm' }[u] || u.toLowerCase();
+}
+
+const cacheNomesAmigaveis = new Map();
+function nomeAmigavelProduto(nomeOriginal) {
+  const original = String(nomeOriginal || '').trim();
+  if (!original) return { nome: '', tipo: '', marca: '' };
+  if (cacheNomesAmigaveis.has(original)) return cacheNomesAmigaveis.get(original);
+
+  const texto = original.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+    .replace(/\+/g, ' + ').replace(/[^A-Z0-9,.+ ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let tokens = texto.split(' ').filter(t => t && t !== '.');
+
+  // 1) tamanhos
+  const tamanhos = [];
+  tokens = tokens.filter(t => { const f = formatarTamanho(t.replace(/\.$/, '')); if (f) { tamanhos.push(f); return false; } return true; });
+
+  // 2) marca (várias palavras primeiro)
+  let marca = '';
+  for (const [abrev, nomeMarca] of Object.entries(MARCAS_PRODUTO).filter(([k]) => k.includes(' '))) {
+    const partes = abrev.split(' ');
+    const i = tokens.findIndex((t, k) => partes.every((pp, j) => tokens[k + j] === pp));
+    if (i >= 0) { marca = nomeMarca; tokens.splice(i, partes.length); break; }
+  }
+  if (!marca) {
+    // a primeira palavra quase sempre é o tipo: procura a marca a partir da segunda
+    const i = tokens.findIndex((t, k) => MARCAS_PRODUTO[t] && !(k === 0 && TIPOS_PRODUTO[t]));
+    if (i >= 0) { marca = MARCAS_PRODUTO[tokens[i]]; tokens.splice(i, 1); }
+  }
+
+  // 3) tipo pelas primeiras palavras (3, 2 ou 1)
+  let tipo = '';
+  for (let n = Math.min(3, tokens.length); n >= 1 && !tipo; n--) {
+    const chave = tokens.slice(0, n).join(' ');
+    if (TIPOS_PRODUTO[chave]) { tipo = TIPOS_PRODUTO[chave]; tokens = tokens.slice(n); }
+  }
+  if (!tipo && tokens[0] === 'K' && tokens.includes('+')) { tipo = 'Kit'; tokens = tokens.slice(1); }
+  if (!tipo && marca && TIPO_PELA_MARCA[marca]) tipo = TIPO_PELA_MARCA[marca];
+
+  // 4) descrições restantes
+  const descricoes = [];
+  for (let k = 0; k < tokens.length; k++) {
+    const dupla = tokens[k] + ' ' + (tokens[k + 1] || '');
+    if (DESCRITORES_PRODUTO[dupla] !== undefined) { if (DESCRITORES_PRODUTO[dupla]) descricoes.push(DESCRITORES_PRODUTO[dupla]); k++; continue; }
+    const t = tokens[k];
+    if (t === '+') { descricoes.push('+'); continue; }
+    if (DESCRITORES_PRODUTO[t] !== undefined) { if (DESCRITORES_PRODUTO[t]) descricoes.push(DESCRITORES_PRODUTO[t]); continue; }
+    if (/^\d+$/.test(t)) { descricoes.push(t); continue; }
+    descricoes.push(capitalizarPalavra(t));
+  }
+  // "Chocolate ao Leite": evita repetir o tipo nas descrições
+  const descSemRepetir = descricoes.filter(d => !tipo || d.toLowerCase() !== tipo.toLowerCase());
+
+  const corpo = [tipo, ...descSemRepetir, ...tamanhos].filter(Boolean).join(' ').replace(/\s+\+\s+/g, ' + ').replace(/\s+/g, ' ').trim();
+  const nome = (corpo || original) + (marca ? ` - Marca ${marca}` : '');
+  const r = { nome, tipo, marca, original };
+  cacheNomesAmigaveis.set(original, r);
+  return r;
+}
+
+// Nome amigável em destaque + nome da nota em letra menor (para achar na prateleira)
+function nomeProdutoHtml(nomeOriginal, classeOriginal = 'card-subtext') {
+  const n = nomeAmigavelProduto(nomeOriginal);
+  const igual = normalizarTextoProduto(n.nome) === normalizarTextoProduto(n.original);
+  return `<strong>${esc(n.nome)}</strong>${igual ? '' : `<div class="${classeOriginal}" style="font-size:.7rem">${esc(n.original)}</div>`}`;
+}
+
 function secaoDoProduto(nome) {
   const n = normalizarTextoProduto(nome);
   return (SECOES_MERCADO.find(sx => sx.re.test(n)) || { nome: SECAO_PADRAO }).nome;
@@ -6987,7 +7184,7 @@ function calcularPrevisaoMercado(mesLimite, mesAlvo = mesLimite) {
       const qtdOc = g.porPeso ? Math.max(0.1, Math.round(qtdPorCompra * 10) / 10) : Math.max(1, Math.round(qtdPorCompra));
       const precoOc = g.ultimoPreco || (Object.values(g.valorPorMes).reduce((a, v) => a + v, 0) / (totalQtd || 1));
       ocasionais.push({
-        nome: g.nome, marca: g.marca, secao: secaoDoProduto(g.nome), porPeso: g.porPeso,
+        nome: g.nome, marca: g.marca, secao: secaoDoProduto(nomeAmigavelProduto(g.nome).tipo || g.nome), porPeso: g.porPeso,
         qtd: qtdOc, preco: precoOc, subtotal: qtdOc * precoOc,
         vezes, intervalo, ultima, chance, provavel: chance >= 0.75
       });
@@ -6998,7 +7195,7 @@ function calcularPrevisaoMercado(mesLimite, mesAlvo = mesLimite) {
     essenciais.push({
       nome: g.nome,
       marca: g.marca,
-      secao: secaoDoProduto(g.nome),
+      secao: secaoDoProduto(nomeAmigavelProduto(g.nome).tipo || g.nome),
       porPeso: g.porPeso,
       qtd,
       preco,
@@ -7089,7 +7286,7 @@ function renderListaMensal() {
   const ritmoTxt = o => o.intervalo ? `a cada ~${o.intervalo.toFixed(o.intervalo % 1 ? 1 : 0).replace('.', ',')} ${o.intervalo >= 2 ? 'meses' : 'mês'} · última ${rotuloMes(o.ultima)}` : `comprado ${o.vezes}x · última ${rotuloMes(o.ultima)}`;
   const linhaOcasional = o => `
     <tr>
-      <td><strong>${esc(o.nome)}</strong> <span class="badge ${o.provavel ? 'green' : 'amber'}" style="font-size:.64rem">${o.provavel ? 'Provável' : 'Talvez'} ${Math.round(o.chance * 100)}%</span>
+      <td>${nomeProdutoHtml(o.nome)} <span class="badge ${o.provavel ? 'green' : 'amber'}" style="font-size:.64rem">${o.provavel ? 'Provável' : 'Talvez'} ${Math.round(o.chance * 100)}%</span>
         <div class="card-subtext">${ritmoTxt(o)}</div>
         <div class="card-subtext so-celular">${brl(o.preco)}${o.porPeso ? '/kg' : ''}</div></td>
       <td class="col-pc"><span class="badge cyan">${o.secao}</span></td>
@@ -7167,7 +7364,7 @@ function renderListaMensal() {
               <tr><td colspan="5" style="background:rgba(0,0,0,.2);font-weight:800;font-size:.8rem;letter-spacing:.03em">${sec.nome} <span style="float:right;color:var(--text-muted)">${brl(sec.total)}</span></td></tr>
               ${sec.itens.map(i => `
                 <tr>
-                  <td><strong>${esc(i.nome)}</strong>${i.marca ? ` <span class="badge amber" style="font-size:.66rem">${esc(i.marca)}</span>` : ''}
+                  <td>${nomeProdutoHtml(i.nome)}
                     <div class="card-subtext so-celular">${brl(i.preco)}${i.porPeso ? '/kg' : ''} · ${freqTxt(i)}</div></td>
                   <td class="col-pc"><span class="badge cyan">${freqTxt(i)}</span></td>
                   <td class="num"><strong>${fmtQtd(i)}</strong></td>
@@ -7273,7 +7470,7 @@ window.exportarPDFListaMensal = function() {
           ${sec.itens.map(i => `
             <tr>
               <td class="check-col"><div class="chk-box"></div></td>
-              <td><strong>${esc(i.nome)}</strong>${i.marca ? ` <span class="marca">${esc(i.marca)}</span>` : ''}</td>
+              <td>${nomeProdutoHtml(i.nome, 'marca')}</td>
               <td class="num"><strong>${fmtQtd(i)}</strong></td>
               <td class="num">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
               <td class="num"><strong>${brl(i.subtotal)}</strong></td>
@@ -7286,7 +7483,7 @@ window.exportarPDFListaMensal = function() {
         ${d.provaveis.map(i => `
           <tr>
             <td class="check-col"><div class="chk-box"></div></td>
-            <td><strong>${esc(i.nome)}</strong></td>
+            <td>${nomeProdutoHtml(i.nome, 'marca')}</td>
             <td class="num"><strong>${fmtQtd(i)}</strong></td>
             <td class="num">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
             <td class="num">${brl(i.subtotal)}</td>
@@ -7298,7 +7495,7 @@ window.exportarPDFListaMensal = function() {
         ${d.talvez.map(i => `
           <tr>
             <td class="check-col"><div class="chk-box"></div></td>
-            <td>${esc(i.nome)}</td>
+            <td>${nomeProdutoHtml(i.nome, 'marca')}</td>
             <td class="num">${fmtQtd(i)}</td>
             <td class="num">${brl(i.preco)}${i.porPeso ? '/kg' : ''}</td>
             <td class="num">${brl(i.subtotal)}</td>
